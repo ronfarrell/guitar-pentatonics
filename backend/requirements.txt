@@ -9,16 +9,11 @@ pandas
 librosa
 soundfile
 
-torch
-torchaudio
-
 yt-dlp
 
 black
 ruff
 pytest
 
-essentia-d
-madmom
-crepe
-chordino
+torch
+torchaudio
