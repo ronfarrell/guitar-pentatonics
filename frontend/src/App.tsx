@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import Fretboard from './components/Fretboard'
 import { ROOT_NOTES } from './theory/notes'
@@ -9,7 +9,13 @@ import type { ScaleType } from './theory/scales'
 function App() {
   const [root, setRoot] = useState<NoteName>(ROOT_NOTES[0])
   const [scaleType, setScaleType] = useState<ScaleType>('Major Pentatonic')
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [youtubeUrl, setYoutubeUrl] = useState('')
   const scaleNotes = getScaleNotes(root, scaleType)
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+  }, [theme])
 
   return (
     <main className="app-shell">
@@ -20,6 +26,16 @@ function App() {
           <p className="subtitle">
             Select a key and pentatonic scale, then study the pattern across a standard 6-string guitar fretboard.
           </p>
+        </div>
+
+        <div className="hero-actions">
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={() => setTheme((current) => (current === 'light' ? 'dark' : 'light'))}
+          >
+            {theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          </button>
         </div>
 
         <div className="controls-panel">
@@ -43,6 +59,17 @@ function App() {
                 </option>
               ))}
             </select>
+          </label>
+
+          <label>
+            YouTube link
+            <input
+              type="text"
+              className="youtube-input"
+              placeholder="Paste video URL here"
+              value={youtubeUrl}
+              onChange={(event) => setYoutubeUrl(event.target.value)}
+            />
           </label>
         </div>
       </section>
