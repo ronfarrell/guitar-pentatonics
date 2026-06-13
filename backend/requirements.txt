@@ -17,3 +17,8 @@ yt-dlp
 black
 ruff
 pytest
+
+essentia-d
+madmom
+crepe
+chordino

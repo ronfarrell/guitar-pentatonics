@@ -49,3 +49,5 @@ htmlcov/
 # OS generated files
 Thumbs.db
 desktop.ini
+
+/data/audio
