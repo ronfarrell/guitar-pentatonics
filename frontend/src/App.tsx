@@ -1,121 +1,70 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
 import './App.css'
+import Fretboard from './components/Fretboard'
+import { ROOT_NOTES } from './theory/notes'
+import type { NoteName } from './theory/notes'
+import { SCALE_TYPES, getScaleNotes } from './theory/scales'
+import type { ScaleType } from './theory/scales'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [root, setRoot] = useState<NoteName>(ROOT_NOTES[0])
+  const [scaleType, setScaleType] = useState<ScaleType>('Major Pentatonic')
+  const scaleNotes = getScaleNotes(root, scaleType)
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <main className="app-shell">
+      <section className="hero">
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
+          <p className="eyebrow">Guitar improv assistant</p>
+          <h1>Pentatonic tab visualizer</h1>
+          <p className="subtitle">
+            Select a key and pentatonic scale, then study the pattern across a standard 6-string guitar fretboard.
           </p>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
 
-      <div className="ticks"></div>
+        <div className="controls-panel">
+          <label>
+            Key
+            <select value={root} onChange={(event) => setRoot(event.target.value as NoteName)}>
+              {ROOT_NOTES.map((note) => (
+                <option key={note} value={note}>
+                  {note}
+                </option>
+              ))}
+            </select>
+          </label>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
+          <label>
+            Scale
+            <select value={scaleType} onChange={(event) => setScaleType(event.target.value as ScaleType)}>
+              {SCALE_TYPES.map((scale) => (
+                <option key={scale} value={scale}>
+                  {scale}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </section>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      <section className="summary-card">
+        <div>
+          <h2>Why this helps</h2>
+          <p>
+            Visualize the pentatonic shape in a familiar tab layout. This helps you find scale tones faster while improvising on guitar.
+          </p>
+        </div>
+        <div className="scale-badges">
+          {scaleNotes.map((note) => (
+            <span key={note} className="note-chip">
+              {note}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      <Fretboard root={root} scaleType={scaleType} />
+    </main>
   )
 }
 
