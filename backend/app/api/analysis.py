@@ -1,5 +1,7 @@
 from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi import HTTPException
+from pathlib import Path
 from app.models.analysis import AnalysisRequest, AnalysisResult, Chord
 from app.services.analysis import process_youtube_video
 from app.services.progress import get_progress, cleanup_progress
@@ -18,7 +20,7 @@ def demo_analysis():
     return {
         "key": "A Minor",
         "chords": [
-            {"start": 0, "end": 4, "chord": "Am"},
+            {"start": 1, "end": 4, "chord": "Am"},
             {"start": 4, "end": 8, "chord": "F"},
             {"start": 8, "end": 12, "chord": "C"},
         ],
@@ -132,11 +134,47 @@ async def analyze_youtube(request: AnalysisRequest) -> AnalysisResult:
         dummy_result = AnalysisResult(
             key="A Minor",
             chords=[
-                Chord(start=0, end=4, chord="Am"),
+                Chord(start=2, end=4, chord="Am"),
                 Chord(start=4, end=8, chord="F"),
                 Chord(start=8, end=12, chord="C"),
             ],
             audio_path=None,
+            video_path=None,
         )
         logger.info(f"Returning fallback data")
         return dummy_result
+
+
+@router.get("/video/{file_path:path}")
+async def serve_video(file_path: str):
+    """
+    Serve video files from local cache
+    
+    Usage: GET /analysis/video/backend/data/videos/{hash}/video.mp4
+    """
+    try:
+        # Convert file_path to Path object
+        full_path = Path(file_path)
+        
+        # Security check: ensure path is within data directory
+        data_dir = Path(__file__).parent.parent.parent / "data"
+        if not full_path.resolve().is_relative_to(data_dir.resolve()):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Check if file exists
+        if not full_path.exists():
+            raise HTTPException(status_code=404, detail="Video not found")
+        
+        logger.info(f"Serving video: {full_path}")
+        
+        # Serve with appropriate media type
+        return FileResponse(
+            full_path,
+            media_type="video/mp4",
+            headers={"Content-Disposition": "inline"}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving video: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error serving video")

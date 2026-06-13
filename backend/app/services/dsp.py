@@ -25,7 +25,7 @@ async def analyze_audio(audio_path: str) -> dict:
     # For now, return mock data
     key = "A Minor"
     chords = [
-        Chord(start=0, end=4, chord="Am"),
+        Chord(start=3, end=4, chord="Am"),
         Chord(start=4, end=8, chord="F"),
         Chord(start=8, end=12, chord="C"),
         Chord(start=12, end=16, chord="G"),

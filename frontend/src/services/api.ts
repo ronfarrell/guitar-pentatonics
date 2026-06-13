@@ -9,6 +9,8 @@ export type HealthResponse = {
 export type AnalysisDemoResponse = {
   key: string;
   chords: Array<{ start: number; end: number; chord: string }>;
+  audio_path?: string;
+  video_path?: string;
 };
 
 // API error handling

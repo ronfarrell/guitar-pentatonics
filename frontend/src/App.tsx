@@ -21,25 +21,37 @@ function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [submittedVideoId, setSubmittedVideoId] = useState<string | null>(null)
+  const [submittedUrl, setSubmittedUrl] = useState<string | null>(null)
   const [analysisData, setAnalysisData] = useState<AnalysisDemoResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<ProgressState | null>(null)
   const [jobId, setJobId] = useState<string | null>(null)
+  const [iframeError, setIframeError] = useState(false)
   const eventSourceRef = useRef<EventSource | null>(null)
   const scaleNotes = getScaleNotes(root, scaleType)
 
   // Extract YouTube video ID from various URL formats
   const extractVideoId = (url: string): string | null => {
+    // Remove query parameters and fragments to clean the URL
+    const cleanUrl = url.split(/[?#]/)[0]
+    
     const patterns = [
+      // Standard youtube.com/watch?v= format
       /youtube\.com\/watch\?v=([^&]+)/,
-      /youtu\.be\/([^?]+)/,
-      /youtube\.com\/embed\/([^?]+)/,
+      // Short youtu.be format
+      /youtu\.be\/([^?&/]+)/,
+      // Embed format
+      /youtube\.com\/embed\/([^?&/]+)/,
+      // Just the video ID itself
+      /^([a-zA-Z0-9_-]{11})$/,
     ]
     
     for (const pattern of patterns) {
-      const match = url.match(pattern)
-      if (match) return match[1]
+      const match = url.match(pattern) || cleanUrl.match(pattern)
+      if (match && match[1]) {
+        return match[1]
+      }
     }
     return null
   }
@@ -49,6 +61,7 @@ function App() {
     setError(null)
     setProgress(null)
     setAnalysisData(null)
+    setIframeError(false)
     
     if (!youtubeUrl.trim()) {
       setError('Please enter a YouTube URL')
@@ -62,6 +75,7 @@ function App() {
     }
 
     setSubmittedVideoId(videoId)
+    setSubmittedUrl(youtubeUrl)
     setLoading(true)
 
     try {
@@ -79,17 +93,27 @@ function App() {
 
         // When complete, fetch final results
         if (progressData.status === 'completed') {
-          // Fallback: Return dummy data (in real app, fetch actual analysis results)
-          setAnalysisData({
-            key: 'A Minor',
-            chords: [
-              { start: 0, end: 4, chord: 'Am' },
-              { start: 4, end: 8, chord: 'F' },
-              { start: 8, end: 12, chord: 'C' },
-            ],
-          })
-          eventSource.close()
-          setLoading(false)
+          // Fetch actual analysis results (will be cached, so instant)
+          api.analysis.analyze(youtubeUrl)
+            .then((result) => {
+              setAnalysisData(result)
+              eventSource.close()
+              setLoading(false)
+            })
+            .catch((err) => {
+              console.error('Failed to fetch analysis results:', err)
+              // Fallback to dummy data
+              setAnalysisData({
+                key: 'A Minor',
+                chords: [
+                  { start: 1, end: 4, chord: 'Am' },
+                  { start: 4, end: 8, chord: 'F' },
+                  { start: 8, end: 12, chord: 'C' },
+                ],
+              })
+              eventSource.close()
+              setLoading(false)
+            })
         }
       }
 
@@ -233,17 +257,86 @@ function App() {
 
       {submittedVideoId && (
         <section className="video-section">
-          <div className="video-player">
-            <iframe
-              width="100%"
-              height="400"
-              src={`https://www.youtube.com/embed/${submittedVideoId}`}
-              title="YouTube video player"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          </div>
+          {submittedVideoId && analysisData?.video_path ? (
+            <div className="video-player">
+              <video
+                width="100%"
+                height="400"
+                controls
+                style={{ borderRadius: '8px', backgroundColor: '#000' }}
+              >
+                <source
+                  src={`${import.meta.env.VITE_API_BASE_URL}/analysis/video/${analysisData.video_path}`}
+                  type="video/mp4"
+                />
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          ) : !iframeError ? (
+            <div className="video-player">
+              <iframe
+                key={submittedVideoId}
+                width="100%"
+                height="400"
+                src={`https://www.youtube.com/embed/${submittedVideoId}?modestbranding=1&rel=0`}
+                title="YouTube video player"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                onError={() => setIframeError(true)}
+              />
+            </div>
+          ) : (
+            <div
+              style={{
+                backgroundColor: 'var(--surface)',
+                border: '2px solid var(--border)',
+                borderRadius: '8px',
+                padding: '24px',
+                textAlign: 'center',
+                minHeight: '400px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <p style={{ marginBottom: '16px', color: '#666' }}>
+                This video cannot be embedded directly. It may be:
+              </p>
+              <ul
+                style={{
+                  textAlign: 'left',
+                  marginBottom: '16px',
+                  display: 'inline-block',
+                  color: '#666',
+                  fontSize: '0.9em',
+                }}
+              >
+                <li>Age-restricted</li>
+                <li>Embedding disabled by the uploader</li>
+                <li>Private or deleted</li>
+                <li>Geoblocked in your region</li>
+              </ul>
+              <a
+                href={submittedUrl || `https://www.youtube.com/watch?v=${submittedVideoId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-block',
+                  backgroundColor: 'var(--accent)',
+                  color: 'white',
+                  padding: '10px 20px',
+                  borderRadius: '4px',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.95em',
+                }}
+              >
+                Open Video on YouTube →
+              </a>
+            </div>
+          )}
 
           {analysisData && (
             <div className="analysis-results">

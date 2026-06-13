@@ -1,6 +1,6 @@
 """Main analysis orchestration service"""
 from app.models.analysis import AnalysisRequest, AnalysisResult, Chord
-from app.services.download import download_youtube_audio
+from app.services.download import download_youtube_audio, download_youtube_video
 from app.services.dsp import analyze_audio
 from app.services.storage import save_analysis, get_cached_analysis
 from app.services.progress import ProgressTracker
@@ -13,7 +13,7 @@ async def process_youtube_video(request: AnalysisRequest, job_id: str | None = N
     """
     Complete analysis pipeline with caching and progress tracking:
     1. Check if video already analyzed → return cached result
-    2. Download audio (with caching by URL)
+    2. Download audio and video (with caching by URL)
     3. Run DSP/ML analysis
     4. Store results
     5. Return result
@@ -41,12 +41,15 @@ async def process_youtube_video(request: AnalysisRequest, job_id: str | None = N
         
         logger.info(f"Processing new video: {request.youtube_url}")
         
-        # Step 2: Download audio (with file caching)
+        # Step 2: Download audio and video (with file caching)
         if progress:
-            progress.update("downloading", 20, "Downloading audio...")
+            progress.update("downloading", 10, "Downloading video and audio...")
         
         audio_path = await download_youtube_audio(request.youtube_url, progress)
         logger.info(f"Audio ready at: {audio_path}")
+        
+        video_path = await download_youtube_video(request.youtube_url, progress)
+        logger.info(f"Video ready at: {video_path}")
         
         # Step 3: Run DSP/ML pipeline
         if progress:
@@ -62,6 +65,7 @@ async def process_youtube_video(request: AnalysisRequest, job_id: str | None = N
             key=analysis_data["key"],
             chords=analysis_data["chords"],
             audio_path=audio_path,
+            video_path=video_path,
         )
         
         # Step 5: Store in database

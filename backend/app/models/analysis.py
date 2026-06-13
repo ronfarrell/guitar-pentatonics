@@ -16,3 +16,4 @@ class AnalysisResult(BaseModel):
     key: str
     chords: List[Chord]
     audio_path: str | None = None
+    video_path: str | None = None
