@@ -1,0 +1,1 @@
+creating an app to process music and show the relating guitar pentatonic tab
