@@ -1,57 +1,28 @@
-# 🎸 Guitar Pentatonics & Improvisation Assistant
+# 🎸 Guitar Pentatonics Backend
 
-A full-stack music intelligence application that analyzes songs and visualizes guitar improvisation guidance in real time. The system maps chord progressions to musical scales and displays them on an interactive fretboard to help guitarists improvise more effectively.
+Backend service for the Guitar Pentatonics & Improvisation Assistant.
 
-> 🚧 This project is currently in active development (MVP phase: frontend + mock analysis pipeline complete).
+This service is responsible for:
+- Audio ingestion (YouTube / local files)
+- Harmonic analysis (key + chord detection)
+- Time-aligned chord timeline generation
+- Scale mapping logic for guitar improvisation
 
----
-
-## 🧠 Overview
-
-This application bridges **audio signal processing**, **music theory**, and **interactive visualization**.
-
-Given a song (eventually via YouTube link or local audio file), the system will:
-
-- Extract harmonic structure (chords + key)
-- Map harmonic context to appropriate guitar scales
-- Visualize scales on a fretboard in sync with playback
-
-The long-term goal is a hybrid system combining:
-- DSP (Digital Signal Processing)
-- Machine learning (PyTorch)
-- Real-time visualization
+Built with FastAPI and designed to support future ML-based audio analysis (PyTorch).
 
 ---
 
-## 🎯 Current MVP
+## 🧠 System Purpose
 
-### ✅ Implemented
-- Interactive guitar fretboard UI (React + TypeScript)
-- Key-based pentatonic scale visualization
-- Scale selection and highlighting logic
-- Basic project structure for full-stack expansion
+The backend acts as the **music intelligence layer** of the application.
 
-### 🚧 In Progress
-- Backend API (FastAPI)
-- Chord progression timeline system
-- YouTube audio ingestion pipeline (via yt-dlp)
-- Audio analysis pipeline (librosa + DSP)
+It converts raw audio input into structured musical data:
 
----
-
-## 🧩 Planned Architecture
-
-```text
-Frontend (React + TypeScript)
-        ↓
-Backend API (FastAPI)
-        ↓
-Audio Processing Pipeline (librosa / DSP)
-        ↓
-ML Models (PyTorch - chord/key detection)
-        ↓
-Chord Timeline + Key Estimation
-        ↓
-Scale Mapping Engine
-        ↓
-Fretboard Visualization
+```text id="xq9m2a"
+Audio Input
+   ↓
+Signal Processing / ML (future)
+   ↓
+Chord Timeline + Key Detection
+   ↓
+Frontend Visualization
