@@ -59,8 +59,8 @@ body {
   max-width: 1100px;
   min-height: 100vh;
   padding: 24px 20px 40px;
+  box-sizing: border-box;
 }
-
 button,
 select,
 input {
@@ -72,12 +72,12 @@ input {
 ========================= */
 
 .app-shell {
-  max-width: 1100px;
-  margin: 0 auto;
-  display: grid;
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
   gap: 24px;
 }
-
 /* =========================
    HERO
 ========================= */
@@ -90,6 +90,11 @@ input {
   border-radius: 24px;
   box-shadow: var(--shadow);
   padding: 28px;
+  width: 100%;
+}
+
+.fretboard-card {
+  overflow: hidden;
 }
 
 .hero {
@@ -103,20 +108,24 @@ input {
 }
 
 .theme-toggle {
-  padding: 12px 18px;
-  border-radius: 16px;
+  padding: 10px 14px;
+  border-radius: 12px;
   border: 1px solid transparent;
   background: var(--accent);
   color: white;
   font-weight: 700;
   cursor: pointer;
   transition:
-    transform 0.2s ease,
-    background 0.2s ease;
+    transform 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .theme-toggle:hover {
   transform: translateY(-1px);
+}
+
+.theme-toggle:disabled {
+  opacity: 0.6;
 }
 
 .eyebrow {
@@ -147,7 +156,6 @@ input {
 .controls-panel {
   display: grid;
   grid-template-columns: repeat(2, minmax(160px, 1fr));
-  gap: 16px;
 }
 
 label {
@@ -252,12 +260,12 @@ select:focus,
 .fretboard-grid {
   display: grid;
   gap: 8px;
-  overflow-x: auto;
+  width: max-content;
 }
 
 .fretboard-row {
   display: grid;
-  grid-template-columns: 72px repeat(23, minmax(52px, 1fr));
+  grid-template-columns: 72px repeat(23, 52px);
   gap: 8px;
   align-items: center;
 }
@@ -312,7 +320,20 @@ select:focus,
 }
 
 .fretboard-card {
+  width: 100%;
   overflow: hidden;
+}
+
+.fretboard-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.fretboard-grid {
+  display: grid;
+  gap: 8px;
+  width: max-content;
 }
 
 /* =========================
@@ -350,12 +371,12 @@ select:focus,
    FIXED CHORD SIDEBAR
 ========================= */
 
-.video-layout {
+/* .video-layout {
   display: grid;
   grid-template-columns: 1fr 2.5fr 1.2fr;
   gap: 24px;
   align-items: start;
-}
+} */
 .chord-sidebar {
   position: relative;
 
@@ -447,18 +468,18 @@ select:focus,
   }
 }
 
-.page-layout {
+/* .page-layout {
   display: grid;
   grid-template-columns: 1fr 2fr 320px;
   gap: 24px;
   align-items: start;
-}
+} */
 
-.col-empty {
+/* .col-empty {
   min-width: 1px;
-}
+} */
 
-.analysis-card {
+/* .analysis-card {
   grid-column: 3;
 
   position: sticky;
@@ -475,7 +496,7 @@ select:focus,
 
   display: flex;
   flex-direction: column;
-}
+} */
 
 .fret-mode-toggle {
   display: flex;
@@ -497,4 +518,105 @@ select:focus,
   background: var(--accent);
   color: white;
   border-color: var(--accent);
+}
+
+.control-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.control-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* =========================
+   CONTROL BUTTONS
+========================= */
+
+.primary-button {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
+  white-space: nowrap;
+}
+
+.primary-button:hover {
+  transform: translateY(-1px);
+}
+
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* theme toggle (restore consistency) */
+.theme-toggle {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+}
+
+.control-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.control-row input {
+  flex: 1;
+}
+
+.controls-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.chord-transition-bar {
+  display: grid;
+  grid-template-columns: 60px 1fr 60px;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 18px;
+}
+
+.chord-label {
+  font-weight: 700;
+  text-align: center;
+  color: var(--accent);
+}
+
+.bar-track {
+  height: 10px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.08s linear;
 }
