@@ -2,7 +2,13 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, analysis
+from app.api import health, analysis, songs
+
+import logging
+
+logging.getLogger().setLevel(logging.INFO)
+logging.getLogger("networkx").setLevel(logging.ERROR)
+logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
 
 app = FastAPI(
@@ -27,6 +33,7 @@ app.add_middleware(
 # -----------------------
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(analysis.router, prefix="/analysis", tags=["Analysis"])
+app.include_router(songs.router, prefix="/songs", tags=["Songs"])
 
 
 # -----------------------

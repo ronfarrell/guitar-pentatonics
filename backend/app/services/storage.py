@@ -32,6 +32,7 @@ def init_db():
             youtube_url TEXT UNIQUE NOT NULL,
             url_hash TEXT UNIQUE NOT NULL,
             key TEXT NOT NULL,
+            video_title TEXT,
             chords TEXT NOT NULL,  -- JSON array
             audio_path TEXT,
             video_path TEXT,
@@ -58,38 +59,56 @@ def get_url_hash(youtube_url: str) -> str:
 def get_cached_analysis(youtube_url: str) -> AnalysisResult | None:
     """
     Check if we already have analysis for this YouTube URL
-    
-    Args:
-        youtube_url: YouTube URL
-        
-    Returns:
-        AnalysisResult if cached, None otherwise
     """
     init_db()
     logger.info(f"[DB] Checking cache for: {youtube_url}")
-    
+
     conn = _get_db_connection()
     cursor = conn.cursor()
-    
+
     url_hash = get_url_hash(youtube_url)
+
     cursor.execute(
-        "SELECT key, chords, audio_path, video_path FROM analyses WHERE url_hash = ?",
+        """
+        SELECT key, video_title, chords, audio_path, video_path
+        FROM analyses
+        WHERE url_hash = ?
+        """,
         (url_hash,)
     )
+
     row = cursor.fetchone()
     conn.close()
-    
+
     if not row:
-        logger.info(f"[DB] Cache miss")
+        logger.info("[DB] Cache miss")
         return None
-    
-    logger.info(f"[DB] Cache hit!")
-    key, chords_json, audio_path, video_path = row
+
+    logger.info("[DB] Cache hit!")
+
+    key, video_title, chords_json, audio_path, video_path = row
+
+    logger.warning(f"[DB] Cached video title: {video_title}")
+    logger.warning(f"[DB] Cached audio path: {audio_path}")
+    logger.warning(f"[DB] Cached video path: {video_path}")
+
     from app.models.analysis import Chord
     chords = [Chord(**chord) for chord in json.loads(chords_json)]
-    
-    return AnalysisResult(key=key, chords=chords, audio_path=audio_path, video_path=video_path)
 
+    result = AnalysisResult(
+        key=key,
+        chords=chords,
+        audio_path=audio_path,
+        video_path=video_path,
+    )
+
+    # attach title if your model supports it
+    if hasattr(result, "video_title"):
+        result.video_title = video_title
+
+    logger.info(f"[DB] Cached chords count: {len(chords)}")
+
+    return result
 
 def save_analysis(youtube_url: str, result: AnalysisResult) -> int:
     """
@@ -113,11 +132,20 @@ def save_analysis(youtube_url: str, result: AnalysisResult) -> int:
     chords_json = json.dumps([chord.model_dump() for chord in result.chords])
     
     try:
+
+        logger.info("[DB] Saving analysis")
+        logger.info(f"[DB] youtube_url = {youtube_url}")
+        logger.info(f"[DB] key = {result.key}")
+        logger.info(f"[DB] video_title = {result.video_title}")
+        logger.info(f"[DB] audio_path = {result.audio_path}")
+        logger.info(f"[DB] video_path = {result.video_path}")
+        logger.info(f"[DB] chords count = {len(result.chords)}")
+
         logger.info(f"[DB] Inserting analysis record...")
         cursor.execute("""
-            INSERT INTO analyses (youtube_url, url_hash, key, chords, audio_path, video_path)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (youtube_url, url_hash, result.key, chords_json, result.audio_path, result.video_path))
+            INSERT INTO analyses (youtube_url, url_hash, key, chords, audio_path, video_path, video_title)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (youtube_url, url_hash, result.key, chords_json, result.audio_path, result.video_path, result.video_title  ))
         
         logger.info(f"[DB] Insert successful")
         record_id = cursor.lastrowid
@@ -157,3 +185,17 @@ def get_analysis(record_id: int) -> AnalysisResult | None:
     chords = [Chord(**chord) for chord in json.loads(chords_json)]
     
     return AnalysisResult(key=key, chords=chords, audio_path=audio_path, video_path=video_path)
+
+
+def list_all_analyses(limit: int = 100):
+    """List all analysis results from the database"""
+    init_db()
+    
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT id, youtube_url, url_hash, key, video_title FROM analyses LIMIT ?", (limit,))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return rows

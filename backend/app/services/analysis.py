@@ -45,12 +45,14 @@ async def process_youtube_video(request: AnalysisRequest, job_id: str | None = N
         if progress:
             progress.update("downloading", 10, "Downloading video and audio...")
         
-        audio_path = await download_youtube_audio(request.youtube_url, progress)
+        audio_path, metadata = await download_youtube_audio(request.youtube_url, progress)
         logger.info(f"Audio ready at: {audio_path}")
+        
         
         video_path = await download_youtube_video(request.youtube_url, progress)
         logger.info(f"Video ready at: {video_path}")
         
+
         # Step 3: Run DSP/ML pipeline
         if progress:
             progress.update("analyzing", 50, "Analyzing audio for key and chords...")
@@ -66,6 +68,7 @@ async def process_youtube_video(request: AnalysisRequest, job_id: str | None = N
             chords=analysis_data["chords"],
             audio_path=audio_path,
             video_path=video_path,
+            video_title=metadata.get("title")
         )
         
         # Step 5: Store in database
