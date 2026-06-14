@@ -887,3 +887,59 @@ select:focus,
   border-color: #ef4444;
   color: #ef4444;
 }
+
+.saved-songs-header {
+  position: sticky;
+  top: 0;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 12px 14px;
+  margin-bottom: 10px;
+
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+
+  z-index: 10;
+
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+:root[data-theme="dark"] .saved-songs-header {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.saved-songs-search {
+  padding: 10px 0 14px;
+}
+
+.saved-songs-input {
+  width: 100%;
+  padding: 10px 12px;
+
+  border-radius: 12px;
+  border: 1px solid var(--border);
+
+  background: var(--surface);
+  color: var(--text);
+
+  font-size: 13px;
+
+  outline: none;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.saved-songs-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.saved-songs-input::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}

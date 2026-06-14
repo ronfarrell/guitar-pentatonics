@@ -25,7 +25,7 @@ function extractRoot(chord: string | null): NoteName | null {
 function App() {
   const [root, setRoot] = useState<NoteName>(ROOT_NOTES[0]);
   const [scaleType, setScaleType] = useState<ScaleType>("Major Pentatonic");
-
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [fretMode, setFretMode] = useState<"manual" | "live">("manual");
 
@@ -34,7 +34,11 @@ function App() {
 
   const { savedSongs, deleteSong, refresh } = useSavedSongs();
 
-  const { analysisData, loading, error, analyze } = useChordAnalysis();
+  const { analysisData, loading, error, analyze, key } = useChordAnalysis(
+    () => {
+      setActiveKey(key);
+    },
+  );
 
   const { videoRef, currentChord, nextChord, progressToNext } =
     useChordTracker(analysisData);
@@ -87,6 +91,8 @@ function App() {
         <SavedSongs
           songs={savedSongs}
           onSelectSong={(song) => {
+            console.log("Key of song:", song.key);
+
             const url = song.youtubeUrl ?? "";
             setYoutubeUrl(song.youtubeUrl ?? "");
             setMenuOpen(false);
@@ -127,6 +133,7 @@ function App() {
             import.meta.env.VITE_API_BASE_URL
           }/analysis/video/${analysisData.video_path}`}
           videoRef={videoRef}
+          videoKey={analysisData?.key ?? ""}
         />
       )}
 

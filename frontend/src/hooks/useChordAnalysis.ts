@@ -9,7 +9,7 @@ export interface ProgressState {
   completed_at: string | null;
 }
 
-export function useChordAnalysis() {
+export function useChordAnalysis(onComplete?: () => void) {
   const [analysisData, setAnalysisData] = useState<AnalysisDemoResponse | null>(
     null,
   );
@@ -20,7 +20,7 @@ export function useChordAnalysis() {
 
   const [currentChord, setCurrentChord] = useState<string | null>(null);
   const [chordProgress, setChordProgress] = useState<any>(null);
-
+  const key = analysisData?.key ?? null;
   const eventSourceRef = useRef<EventSource | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -107,6 +107,7 @@ export function useChordAnalysis() {
 
           es.close();
           setLoading(false);
+          if (onComplete) onComplete();
         }
       };
 
@@ -130,5 +131,6 @@ export function useChordAnalysis() {
     chordProgress,
     analyze,
     attachVideo,
+    key,
   };
 }
