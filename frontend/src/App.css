@@ -943,3 +943,19 @@ select:focus,
   color: var(--muted);
   opacity: 0.8;
 }
+
+.pentatonic-note {
+  background: var(--accent-color);
+  color: white;
+}
+
+.extra-scale-note {
+  border: 2px solid var(--accent-color);
+  color: var(--accent-color);
+}
+
+.root-note {
+  background: gold;
+  color: black;
+  font-weight: bold;
+}
