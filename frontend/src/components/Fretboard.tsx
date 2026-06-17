@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import {
   buildFretboard,
   FRET_COUNT,
@@ -11,19 +11,17 @@ type FretboardProps = {
   root: string;
   scaleType: ScaleType;
   progress: number;
+  prevChord: string | null;
   currentChord: string | null;
   nextChord: string | null;
-  chordNotes?: string[]; // [root, 3rd, 5th] — overrides scale highlighting
+  chordNotes?: string[];
 };
-
-function extractRoot(chord: string | null) {
-  return chord?.match(/^[A-G](#|b)?/)?.[0] ?? "—";
-}
 
 const Fretboard = ({
   root,
   scaleType,
   progress,
+  prevChord,
   currentChord,
   nextChord,
   chordNotes,
@@ -40,8 +38,17 @@ const Fretboard = ({
   const rootNote = scaleNotes[0];
   const chordRoot = chordNotes?.[0] ?? null;
 
-  const current = extractRoot(currentChord);
-  const next = extractRoot(nextChord);
+  const showChordCards = prevChord !== null || currentChord !== null || nextChord !== null;
+
+  // Increment key on each chord change to restart the slide-in animation
+  const [chordAnimKey, setChordAnimKey] = useState(0);
+  const prevChordRef = useRef(currentChord);
+  useEffect(() => {
+    if (currentChord !== prevChordRef.current) {
+      prevChordRef.current = currentChord;
+      setChordAnimKey((k) => k + 1);
+    }
+  }, [currentChord]);
 
   return (
     <section className="fretboard-card">
@@ -73,19 +80,34 @@ const Fretboard = ({
         </div>
       </div>
 
-      {/* 🔥 TRANSITION BAR */}
-      <div className="chord-transition-bar">
-        <span className="chord-label">{current}</span>
+      {/* 3-CARD CHORD DISPLAY */}
+      {showChordCards && (
+        <div className="chord-cards-wrap">
+          <div className="chord-cards" key={chordAnimKey}>
+            <div className="chord-card chord-card--prev">
+              <div className="chord-card-label">Last</div>
+              <div className="chord-card-name">{prevChord ?? "—"}</div>
+            </div>
 
-        <div className="bar-track">
-          <div
-            className="bar-fill"
-            style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }}
-          />
+            <div className="chord-card chord-card--current">
+              <div className="chord-card-label">Now</div>
+              <div className="chord-card-name">{currentChord ?? "—"}</div>
+            </div>
+
+            <div className="chord-card chord-card--next">
+              <div className="chord-card-label">Next</div>
+              <div className="chord-card-name">{nextChord ?? "—"}</div>
+            </div>
+          </div>
+
+          <div className="chord-mini-bar">
+            <div
+              className="chord-mini-bar-fill"
+              style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }}
+            />
+          </div>
         </div>
-
-        <span className="chord-label">{next}</span>
-      </div>
+      )}
 
       {/* FRETBOARD */}
       <div className="fretboard-scroll">

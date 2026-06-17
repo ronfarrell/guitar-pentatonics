@@ -8,7 +8,7 @@ type Props = {
 export default function VideoPlayer({ videoPath, videoRef, videoKey, onTogglePlay }: Props) {
   return (
     <section className="video-card">
-      <video ref={videoRef} playsInline onClick={onTogglePlay} style={{ cursor: "pointer" }}>
+      <video key={videoPath} ref={videoRef} playsInline onClick={onTogglePlay} style={{ cursor: "pointer" }}>
         <source src={videoPath} type="video/mp4" />
       </video>
       <div> Key: {videoKey} </div>

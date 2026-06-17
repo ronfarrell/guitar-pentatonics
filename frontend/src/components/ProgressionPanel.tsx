@@ -1,9 +1,11 @@
 import type { NoteName } from "../theory/notes";
 import {
   PROGRESSIONS,
+  CUSTOM_PROGRESSION_ID,
   getChordName,
-  type Progression,
+  type ProgressionChord,
 } from "../theory/progressions";
+import CustomProgressionBuilder from "./CustomProgressionBuilder";
 
 type Props = {
   root: NoteName;
@@ -11,9 +13,11 @@ type Props = {
   selectedChordIdx: number | null;
   showTriads: boolean;
   fretMode: "manual" | "live";
+  customChords: ProgressionChord[];
   onChangeProgression: (id: string | null) => void;
   onSelectChord: (idx: number | null) => void;
   onToggleTriads: () => void;
+  onUpdateCustomChords: (chords: ProgressionChord[]) => void;
 };
 
 export default function ProgressionPanel({
@@ -22,12 +26,17 @@ export default function ProgressionPanel({
   selectedChordIdx,
   showTriads,
   fretMode,
+  customChords,
   onChangeProgression,
   onSelectChord,
   onToggleTriads,
+  onUpdateCustomChords,
 }: Props) {
-  const progression: Progression | null =
-    PROGRESSIONS.find((p) => p.id === progressionId) ?? null;
+  const isCustom = progressionId === CUSTOM_PROGRESSION_ID;
+  const builtIn = PROGRESSIONS.find((p) => p.id === progressionId) ?? null;
+  const activeChords: ProgressionChord[] = isCustom
+    ? customChords
+    : (builtIn?.chords ?? []);
 
   return (
     <div className="progression-panel">
@@ -47,6 +56,7 @@ export default function ProgressionPanel({
                 {p.name}
               </option>
             ))}
+            <option value={CUSTOM_PROGRESSION_ID}>✏ Build Custom...</option>
           </select>
         </div>
 
@@ -61,12 +71,20 @@ export default function ProgressionPanel({
         </div>
       </div>
 
-      {progression && (
+      {isCustom && (
+        <CustomProgressionBuilder
+          root={root}
+          chords={customChords}
+          onChange={onUpdateCustomChords}
+        />
+      )}
+
+      {activeChords.length > 0 && (
         <div className="progression-chords">
           {fretMode === "manual" && (
             <span className="progression-hint">← → to cycle</span>
           )}
-          {progression.chords.map((chord, i) => {
+          {activeChords.map((chord, i) => {
             const chordName = getChordName(root, chord);
             const isActive = selectedChordIdx === i;
             return (

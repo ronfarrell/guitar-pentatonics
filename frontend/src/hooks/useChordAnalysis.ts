@@ -45,7 +45,6 @@ export function useChordAnalysis(onComplete?: () => void) {
   async function analyze(url: string) {
     setLoading(true);
     setError(null);
-    setAnalysisData(null);
 
     try {
       const { job_id } = await api.analysis.startAnalysis(url);
@@ -59,7 +58,6 @@ export function useChordAnalysis(onComplete?: () => void) {
   async function analyzeWithJobId(job_id: string, youtubeUrl: string, afterComplete?: () => void) {
     setLoading(true);
     setError(null);
-    setAnalysisData(null);
     _trackJob(job_id, youtubeUrl, afterComplete);
   }
 

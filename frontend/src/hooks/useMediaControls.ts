@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 
 export type MediaControls = {
@@ -6,11 +6,13 @@ export type MediaControls = {
   currentTime: number;
   duration: number;
   volume: number;
+  repeat: boolean;
   togglePlay: () => void;
   stop: () => void;
   restart: () => void;
   seek: (t: number) => void;
   setVolumeLevel: (v: number) => void;
+  toggleRepeat: () => void;
   formatTime: (s: number) => string;
 };
 
@@ -22,12 +24,15 @@ export function useMediaControls(
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.5);
+  const [repeat, setRepeat] = useState(false);
+  const repeatRef = useRef(false);
+  const volumeRef = useRef(0.5);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoSrc) return;
 
-    video.volume = 0.5;
+    video.volume = volumeRef.current;
     setPlaying(!video.paused);
     setCurrentTime(video.currentTime);
     if (video.readyState >= 1) setDuration(video.duration);
@@ -37,12 +42,19 @@ export function useMediaControls(
     const onTimeUpdate = () => setCurrentTime(video.currentTime);
     const onLoadedMetadata = () => setDuration(video.duration);
     const onVolumeChange = () => setVolume(video.volume);
+    const onEnded = () => {
+      if (repeatRef.current) {
+        video.currentTime = 0;
+        video.play();
+      }
+    };
 
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("timeupdate", onTimeUpdate);
     video.addEventListener("loadedmetadata", onLoadedMetadata);
     video.addEventListener("volumechange", onVolumeChange);
+    video.addEventListener("ended", onEnded);
 
     return () => {
       video.removeEventListener("play", onPlay);
@@ -50,6 +62,7 @@ export function useMediaControls(
       video.removeEventListener("timeupdate", onTimeUpdate);
       video.removeEventListener("loadedmetadata", onLoadedMetadata);
       video.removeEventListener("volumechange", onVolumeChange);
+      video.removeEventListener("ended", onEnded);
     };
   }, [videoSrc]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -79,9 +92,16 @@ export function useMediaControls(
     v.currentTime = time;
   }
 
+  function toggleRepeat() {
+    const next = !repeatRef.current;
+    repeatRef.current = next;
+    setRepeat(next);
+  }
+
   function setVolumeLevel(level: number) {
     const v = videoRef.current;
     if (!v) return;
+    volumeRef.current = level;
     v.volume = level;
   }
 
@@ -92,5 +112,5 @@ export function useMediaControls(
     return `${m}:${sec.toString().padStart(2, "0")}`;
   }
 
-  return { playing, currentTime, duration, volume, togglePlay, stop, restart, seek, setVolumeLevel, formatTime };
+  return { playing, currentTime, duration, volume, repeat, togglePlay, stop, restart, seek, setVolumeLevel, toggleRepeat, formatTime };
 }

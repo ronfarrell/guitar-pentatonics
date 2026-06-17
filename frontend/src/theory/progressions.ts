@@ -14,6 +14,24 @@ export type Progression = {
   chords: ProgressionChord[];
 };
 
+export const CUSTOM_PROGRESSION_ID = "__custom__";
+
+// Palette of diatonic + common borrowed chords for the custom builder
+export const SCALE_DEGREES: ProgressionChord[] = [
+  { semitones: 0,  quality: "major",      numeral: "I"    },
+  { semitones: 2,  quality: "minor",      numeral: "ii"   },
+  { semitones: 4,  quality: "minor",      numeral: "iii"  },
+  { semitones: 5,  quality: "major",      numeral: "IV"   },
+  { semitones: 7,  quality: "major",      numeral: "V"    },
+  { semitones: 7,  quality: "dominant",   numeral: "V7"   },
+  { semitones: 9,  quality: "minor",      numeral: "vi"   },
+  { semitones: 11, quality: "diminished", numeral: "vii°" },
+  { semitones: 10, quality: "major",      numeral: "♭VII" },
+  { semitones: 8,  quality: "major",      numeral: "♭VI"  },
+  { semitones: 3,  quality: "major",      numeral: "♭III" },
+  { semitones: 5,  quality: "minor",      numeral: "iv"   },
+];
+
 export const PROGRESSIONS: Progression[] = [
   {
     id: "royal-road",

@@ -20,7 +20,7 @@ import { useChordTracker } from "./hooks/useChordTracker";
 import { useSavedSongs } from "./hooks/useSavedSongs";
 import { useMediaControls } from "./hooks/useMediaControls";
 import { isTriadType } from "./theory/scales";
-import { PROGRESSIONS, getChordRoot } from "./theory/progressions";
+import { PROGRESSIONS, CUSTOM_PROGRESSION_ID, getChordRoot, type ProgressionChord } from "./theory/progressions";
 import ProgressionPanel from "./components/ProgressionPanel";
 
 function extractRoot(chord: string | null): NoteName | null {
@@ -40,12 +40,13 @@ function App() {
   const [progressionId, setProgressionId] = useState<string | null>(null);
   const [selectedChordIdx, setSelectedChordIdx] = useState<number | null>(null);
   const [showTriads, setShowTriads] = useState(false);
+  const [customChords, setCustomChords] = useState<ProgressionChord[]>([]);
 
   const { savedSongs, deleteSong, startReanalyze, clearReanalyzingId, reanalyzingId, refresh } = useSavedSongs();
 
   const { analysisData, loading, error, analyze, analyzeWithJobId } = useChordAnalysis(refresh);
 
-  const { videoRef, currentChord, nextChord, progressToNext } =
+  const { videoRef, prevChord, currentChord, nextChord, progressToNext } =
     useChordTracker(analysisData);
 
   const videoSrc = analysisData?.video_path
@@ -76,9 +77,12 @@ function App() {
 
   const selectedProgressionChord = useMemo(() => {
     if (progressionId === null || selectedChordIdx === null) return null;
-    const progression = PROGRESSIONS.find((p) => p.id === progressionId);
-    return progression?.chords[selectedChordIdx] ?? null;
-  }, [progressionId, selectedChordIdx]);
+    const chords =
+      progressionId === CUSTOM_PROGRESSION_ID
+        ? customChords
+        : (PROGRESSIONS.find((p) => p.id === progressionId)?.chords ?? []);
+    return chords[selectedChordIdx] ?? null;
+  }, [progressionId, selectedChordIdx, customChords]);
 
   const fretRoot: NoteName = useMemo(() => {
     if (fretMode === "live" && liveRoot) return liveRoot;
@@ -113,11 +117,16 @@ function App() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
+  const progressionLen =
+    progressionId === null
+      ? 0
+      : progressionId === CUSTOM_PROGRESSION_ID
+        ? customChords.length
+        : (PROGRESSIONS.find((p) => p.id === progressionId)?.chords.length ?? 0);
+
   useEffect(() => {
-    if (fretMode !== "manual" || progressionId === null) return;
-    const progression = PROGRESSIONS.find((p) => p.id === progressionId);
-    if (!progression) return;
-    const len = progression.chords.length;
+    if (fretMode !== "manual" || progressionId === null || progressionLen === 0) return;
+    const len = progressionLen;
 
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
@@ -133,7 +142,7 @@ function App() {
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fretMode, progressionId]);
+  }, [fretMode, progressionId, progressionLen]);
 
   return (
     <>
@@ -215,7 +224,19 @@ function App() {
           )}
         </div>
 
-        <FretModeToggle mode={fretMode} setMode={setFretMode} />
+        <FretModeToggle
+          mode={fretMode}
+          setMode={setFretMode}
+          songKey={analysisData?.key ?? null}
+          onUseSongKey={() => {
+            const raw = analysisData?.key ?? "";
+            const rootNote = raw.match(/^[A-G](#|b)?/)?.[0] as NoteName | undefined;
+            if (rootNote) setRoot(rootNote);
+            setFretMode("manual");
+            setProgressionId(null);
+            setSelectedChordIdx(null);
+          }}
+        />
 
         {/* Fretboard */}
         <div className="main-grid">
@@ -224,6 +245,7 @@ function App() {
               root={fretRoot}
               scaleType={fretScaleType}
               progress={progressToNext}
+              prevChord={prevChord}
               currentChord={currentChord}
               nextChord={nextChord}
               chordNotes={chordNotes}
@@ -232,43 +254,49 @@ function App() {
         </div>
 
         {/* Key, Scale, and Progression — below fretboard */}
-        <div className="controls-panel">
-          <div className="control-group">
-            <label>Key</label>
-            <select value={root} onChange={(e) => setRoot(e.target.value as NoteName)}>
-              {ROOT_NOTES.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
+        <div className="below-fretboard-card">
+          <div className="controls-panel">
+            <div className="control-group">
+              <label>Key</label>
+              <select value={root} onChange={(e) => setRoot(e.target.value as NoteName)}>
+                {ROOT_NOTES.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="control-group">
+              <label>Scale</label>
+              <select value={scaleType} onChange={(e) => setScaleType(e.target.value as ScaleType)}>
+                <optgroup label="Scales">
+                  {SCALE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </optgroup>
+                <optgroup label="Triads">
+                  {TRIAD_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </optgroup>
+              </select>
+            </div>
           </div>
 
-          <div className="control-group">
-            <label>Scale</label>
-            <select value={scaleType} onChange={(e) => setScaleType(e.target.value as ScaleType)}>
-              <optgroup label="Scales">
-                {SCALE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </optgroup>
-              <optgroup label="Triads">
-                {TRIAD_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </optgroup>
-            </select>
-          </div>
-
-        </div>
-
-        <ProgressionPanel
+          <ProgressionPanel
           root={root}
           progressionId={progressionId}
           selectedChordIdx={selectedChordIdx}
+          customChords={customChords}
           onChangeProgression={(id) => {
             setProgressionId(id);
             setSelectedChordIdx(null);
           }}
           onSelectChord={setSelectedChordIdx}
+          onUpdateCustomChords={(chords) => {
+            setCustomChords(chords);
+            setSelectedChordIdx(null);
+          }}
           showTriads={showTriads}
           fretMode={fretMode}
           onToggleTriads={() => setShowTriads((v) => !v)}
         />
+        </div>
 
         {error && <div className="error">{error}</div>}
       </main>

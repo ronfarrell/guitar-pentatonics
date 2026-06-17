@@ -5,7 +5,12 @@ type Props = {
   loading: boolean;
 };
 
-export default function Controls({ youtubeUrl, setYoutubeUrl, onAnalyze, loading }: Props) {
+export default function Controls({
+  youtubeUrl,
+  setYoutubeUrl,
+  onAnalyze,
+  loading,
+}: Props) {
   return (
     <div className="controls-panel controls-panel--url">
       <div className="control-group">
@@ -17,8 +22,12 @@ export default function Controls({ youtubeUrl, setYoutubeUrl, onAnalyze, loading
             onChange={(e) => setYoutubeUrl(e.target.value)}
             placeholder="Paste YouTube URL"
           />
-          <button className="primary-button" onClick={onAnalyze} disabled={loading}>
-            {loading ? "Analyzing..." : "Play & Analyze"}
+          <button
+            className="primary-button"
+            onClick={onAnalyze}
+            disabled={loading}
+          >
+            {loading ? "Analyzing..." : "Analyze"}
           </button>
         </div>
       </div>
