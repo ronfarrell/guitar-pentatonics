@@ -35,10 +35,7 @@ const Fretboard = ({
     [root, scaleType],
   );
 
-  const chordNoteSet = useMemo(
-    () => new Set(chordNotes ?? []),
-    [chordNotes],
-  );
+  const chordNoteSet = useMemo(() => new Set(chordNotes ?? []), [chordNotes]);
 
   const rootNote = scaleNotes[0];
   const chordRoot = chordNotes?.[0] ?? null;
@@ -73,7 +70,6 @@ const Fretboard = ({
           ) : (
             <span>Highlight: {scaleNotes.join(" • ")}</span>
           )}
-          <span>Open strings: {STANDARD_TUNING.join(" - ")}</span>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import asyncio
 import subprocess
+import json
 from pathlib import Path
 import hashlib
 from app.services.progress import ProgressTracker
@@ -37,12 +38,14 @@ async def download_youtube_audio(
         cache_dir = AUDIO_DIR / video_id
         cache_dir.mkdir(parents=True, exist_ok=True)
 
+        metadata_path = cache_dir / "metadata.json"
         cached_files = list(cache_dir.glob("audio.*"))
         if cached_files:
             logger.info(f"[DOWNLOAD] Cache hit: {cached_files[0]}")
+            metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
             if progress_tracker:
                 progress_tracker.update("downloading", 100, "Using cached audio")
-            return str(cached_files[0]), {}
+            return str(cached_files[0]), metadata
 
         if progress_tracker:
             progress_tracker.update("downloading", 10, "Downloading audio...")
@@ -74,7 +77,6 @@ async def download_youtube_audio(
         )
 
         if meta_proc.returncode == 0 and meta_proc.stdout:
-            import json
             metadata = json.loads(meta_proc.stdout.splitlines()[0])
 
         title = metadata.get("title")
@@ -130,6 +132,9 @@ async def download_youtube_audio(
         audio_file = str(files[0])
 
         logger.info(f"[DOWNLOAD] Success: {audio_file}")
+
+        if metadata:
+            metadata_path.write_text(json.dumps(metadata))
 
         if progress_tracker:
             progress_tracker.update("downloading", 100, "Download complete")

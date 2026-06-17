@@ -84,6 +84,10 @@ export const PROGRESSIONS: Progression[] = [
   },
 ];
 
+export function getChordRoot(keyRoot: string, chord: ProgressionChord): string {
+  return NOTE_NAMES[(noteIndex(keyRoot) + chord.semitones) % 12];
+}
+
 export function getChordName(keyRoot: string, chord: ProgressionChord): string {
   const chordRoot = NOTE_NAMES[(noteIndex(keyRoot) + chord.semitones) % 12];
   const suffix =

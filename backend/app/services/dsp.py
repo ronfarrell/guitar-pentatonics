@@ -1,6 +1,7 @@
 """DSP pipeline for music analysis using Essentia"""
 
 import logging
+import numpy as np
 import essentia.standard as es
 from app.models.analysis import Chord
 from collections import deque
@@ -39,15 +40,17 @@ def _run_chord_detection(audio_path: str):
     chord_detect = es.ChordsDetection()
 
     hpcp_frames = []
+    ZERO_HPCP = [0.0] * 36
 
     # =========================
     # FEATURE EXTRACTION LOOP
     # =========================
     for frame in es.FrameGenerator(audio, frameSize=frame_size, hopSize=hop_size):
 
-        # 🔥 energy gating (removes silence / noise)
         energy = rms(frame)
         if energy < 0.01:
+            # preserve frame slot so timestamps stay accurate
+            hpcp_frames.append(ZERO_HPCP)
             continue
 
         spec = spectrum(window(frame))
@@ -61,7 +64,8 @@ def _run_chord_detection(audio_path: str):
     # 🔥 harmonic smoothing BEFORE chord detection (major quality win)
     hpcp_frames = smooth_hpcp(hpcp_frames, window_size=5)
 
-    chords, strengths = chord_detect(hpcp_frames)
+    hpcp_array = np.array(hpcp_frames, dtype=np.float32)
+    chords, strengths = chord_detect(hpcp_array)
 
     return chords, strengths, hop_size, 44100
 
@@ -100,17 +104,19 @@ def _to_timeline(chords, strengths, hop_size, sr, min_confidence=0.3):
         else:
             change_counter = 0
 
-        # commit only if persistent
+        # commit only if persistent — backdate the boundary to when the change actually started
         if change_counter >= change_threshold:
+
+            transition_time = (i - change_threshold + 1) * seconds_per_frame
 
             timeline.append(Chord(
                 start=start,
-                end=i * seconds_per_frame,
+                end=transition_time,
                 chord=current
             ))
 
             current = chord
-            start = i * seconds_per_frame
+            start = transition_time
             change_counter = 0
 
     # last segment
@@ -174,7 +180,7 @@ def smooth_hpcp(hpcp_frames, window_size=5):
 
     for vec in hpcp_frames:
         window.append(vec)
-        avg = sum(window) / len(window)
+        avg = np.mean(list(window), axis=0)
         smoothed.append(avg)
 
     return smoothed

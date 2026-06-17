@@ -11,6 +11,7 @@ export type AnalysisDemoResponse = {
   chords: Array<{ start: number; end: number; chord: string }>;
   audio_path?: string;
   video_path?: string;
+  video_title?: string;
 };
 
 // API error handling
