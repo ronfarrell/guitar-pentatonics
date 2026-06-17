@@ -8,7 +8,11 @@ export type ScaleType =
   | "Blues"
   | "Major + Minor Pentatonic"
   | "Dorian"
-  | "Mixolydian";
+  | "Mixolydian"
+  | "Major Triad"
+  | "Minor Triad"
+  | "Diminished Triad"
+  | "Augmented Triad";
 
 export const SCALE_TYPES: ScaleType[] = [
   "Major",
@@ -20,6 +24,16 @@ export const SCALE_TYPES: ScaleType[] = [
   "Dorian",
   "Mixolydian",
 ];
+
+export const TRIAD_TYPES: ScaleType[] = [
+  "Major Triad",
+  "Minor Triad",
+  "Diminished Triad",
+  "Augmented Triad",
+];
+
+export const isTriadType = (s: ScaleType): boolean =>
+  (TRIAD_TYPES as ScaleType[]).includes(s);
 
 export const getPentatonicNotes = (
   root: string,
@@ -61,6 +75,12 @@ const SCALE_FORMULAS: Record<ScaleType, number[]> = {
 
   // 1 2 3 4 5 6 b7
   Mixolydian: [0, 2, 4, 5, 7, 9, 10],
+
+  // Triads: root, third, fifth
+  "Major Triad": [0, 4, 7],
+  "Minor Triad": [0, 3, 7],
+  "Diminished Triad": [0, 3, 6],
+  "Augmented Triad": [0, 4, 8],
 };
 
 export const getScaleNotes = (root: string, scaleType: ScaleType): string[] => {

@@ -10,10 +10,10 @@ import type { ScaleType } from "../theory/scales";
 type FretboardProps = {
   root: string;
   scaleType: ScaleType;
-
   progress: number;
   currentChord: string | null;
   nextChord: string | null;
+  chordNotes?: string[]; // [root, 3rd, 5th] — overrides scale highlighting
 };
 
 function extractRoot(chord: string | null) {
@@ -26,6 +26,7 @@ const Fretboard = ({
   progress,
   currentChord,
   nextChord,
+  chordNotes,
 }: FretboardProps) => {
   const fretboard = useMemo(() => buildFretboard(FRET_COUNT), []);
 
@@ -34,7 +35,13 @@ const Fretboard = ({
     [root, scaleType],
   );
 
+  const chordNoteSet = useMemo(
+    () => new Set(chordNotes ?? []),
+    [chordNotes],
+  );
+
   const rootNote = scaleNotes[0];
+  const chordRoot = chordNotes?.[0] ?? null;
 
   const current = extractRoot(currentChord);
   const next = extractRoot(nextChord);
@@ -51,7 +58,21 @@ const Fretboard = ({
         </div>
 
         <div className="scale-meta">
-          <span>Highlight: {scaleNotes.join(" • ")}</span>
+          {chordNotes ? (
+            <>
+              <span>
+                Chord tones:{" "}
+                <span className="chord-tone-label">{chordNotes[0]}</span>
+                {" • "}
+                <span className="chord-tone-label">{chordNotes[1]}</span>
+                {" • "}
+                <span className="chord-tone-label">{chordNotes[2]}</span>
+              </span>
+              <span>Scale: {scaleNotes.join(" • ")}</span>
+            </>
+          ) : (
+            <span>Highlight: {scaleNotes.join(" • ")}</span>
+          )}
           <span>Open strings: {STANDARD_TUNING.join(" - ")}</span>
         </div>
       </div>
@@ -90,16 +111,18 @@ const Fretboard = ({
               <div className="string-name">{stringRow.stringName}</div>
 
               {stringRow.notes.map((note, fret) => {
-                const isScaleNote = scaleNotes.includes(note);
-                const isRoot = note === rootNote;
+                let cls = "fret-cell";
+                if (chordRoot) {
+                  if (note === chordRoot) cls += " root-note";
+                  else if (chordNoteSet.has(note)) cls += " chord-tone";
+                  else if (scaleNotes.includes(note)) cls += " scale-note";
+                } else {
+                  if (note === rootNote) cls += " root-note";
+                  else if (scaleNotes.includes(note)) cls += " scale-note";
+                }
 
                 return (
-                  <div
-                    key={`${note}-${fret}`}
-                    className={`fret-cell ${
-                      isScaleNote ? "scale-note" : ""
-                    } ${isRoot ? "root-note" : ""}`}
-                  >
+                  <div key={`${note}-${fret}`} className={cls}>
                     {note}
                   </div>
                 );

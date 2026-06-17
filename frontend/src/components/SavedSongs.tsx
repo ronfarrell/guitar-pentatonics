@@ -1,12 +1,7 @@
-import React, { useState } from "react";
+import { useState } from "react";
+import type { SavedSong } from "../services/savedSongsService";
 
-export type SavedSong = {
-  id: string;
-  title: string;
-  key: string;
-  youtubeUrl: string;
-  createdAt?: string;
-};
+export type { SavedSong };
 
 type Props = {
   songs: SavedSong[];
@@ -23,12 +18,8 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong }: Props) {
 
   return (
     <div className="saved-songs">
-      <div className="saved-songs-header">
+      <div className="saved-songs-top">
         <h2 className="saved-songs-title">Saved Songs</h2>
-      </div>
-
-      {/* Search */}
-      <div className="saved-songs-search">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -45,19 +36,17 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong }: Props) {
             <li key={song.id} className="song-item">
               <div className="song-info" onClick={() => onSelectSong?.(song)}>
                 <div className="song-title">{song.title}</div>
-                {song.key && <div className="song-artist">{song.key}</div>}
+                {song.key && <div className="song-key">{song.key}</div>}
               </div>
 
-              <div className="song-actions">
-                {onDeleteSong && (
-                  <button
-                    className="delete-btn"
-                    onClick={() => onDeleteSong(song.id)}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
+              {onDeleteSong && (
+                <button
+                  className="delete-btn"
+                  onClick={() => onDeleteSong(song.id)}
+                >
+                  ✕
+                </button>
+              )}
             </li>
           ))}
         </ul>

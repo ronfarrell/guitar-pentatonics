@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import "./App.css";
 
 import Fretboard from "./components/Fretboard";
@@ -11,12 +11,13 @@ import SavedSongs from "./components/SavedSongs";
 import type { NoteName } from "./theory/notes";
 import type { ScaleType } from "./theory/scales";
 import { ROOT_NOTES } from "./theory/notes";
-import { getScaleNotes } from "./theory/scales";
 
 import { useChordAnalysis } from "./hooks/useChordAnalysis";
 import { useChordTracker } from "./hooks/useChordTracker";
 import { useSavedSongs } from "./hooks/useSavedSongs";
-import { savedSongsService } from "./services/savedSongsService";
+import { isTriadType } from "./theory/scales";
+import { PROGRESSIONS, getTriadNotes } from "./theory/progressions";
+import ProgressionPanel from "./components/ProgressionPanel";
 
 function extractRoot(chord: string | null): NoteName | null {
   return chord?.match(/^[A-G](#|b)?/)?.[0] as NoteName | null;
@@ -25,20 +26,18 @@ function extractRoot(chord: string | null): NoteName | null {
 function App() {
   const [root, setRoot] = useState<NoteName>(ROOT_NOTES[0]);
   const [scaleType, setScaleType] = useState<ScaleType>("Major Pentatonic");
-  const [activeKey, setActiveKey] = useState<string | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [fretMode, setFretMode] = useState<"manual" | "live">("manual");
 
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const [progressionId, setProgressionId] = useState<string | null>(null);
+  const [selectedChordIdx, setSelectedChordIdx] = useState<number | null>(null);
+
   const { savedSongs, deleteSong, refresh } = useSavedSongs();
 
-  const { analysisData, loading, error, analyze, key } = useChordAnalysis(
-    () => {
-      setActiveKey(key);
-    },
-  );
+  const { analysisData, loading, error, analyze } = useChordAnalysis(refresh);
 
   const { videoRef, currentChord, nextChord, progressToNext } =
     useChordTracker(analysisData);
@@ -47,12 +46,19 @@ function App() {
 
   const fretRoot = fretMode === "live" && liveRoot ? liveRoot : root;
 
-  const fretScaleType =
-    fretMode === "live" && currentChord?.includes("m")
-      ? "Minor Pentatonic"
-      : scaleType;
+  const isMinorChord = fretMode === "live" && !!currentChord?.match(/m(?!aj)/i);
+  const fretScaleType = isMinorChord
+    ? isTriadType(scaleType)
+      ? "Minor Triad"
+      : "Minor Pentatonic"
+    : scaleType;
 
-  const scaleNotes = getScaleNotes(fretRoot, fretScaleType);
+  const chordNotes = useMemo(() => {
+    if (progressionId === null || selectedChordIdx === null) return undefined;
+    const progression = PROGRESSIONS.find((p) => p.id === progressionId);
+    if (!progression) return undefined;
+    return getTriadNotes(fretRoot, progression.chords[selectedChordIdx]);
+  }, [progressionId, selectedChordIdx, fretRoot]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -69,19 +75,7 @@ function App() {
       {/* Hamburger */}
       <button
         className="hamburger"
-        onClick={async () => {
-          setMenuOpen((prev) => {
-            const next = !prev;
-
-            if (next) {
-              savedSongsService.getAll().then((data) => {
-                console.log("songs:", data);
-              });
-            }
-
-            return next;
-          });
-        }}
+        onClick={() => setMenuOpen((prev) => !prev)}
       >
         ☰
       </button>
@@ -91,10 +85,8 @@ function App() {
         <SavedSongs
           songs={savedSongs}
           onSelectSong={(song) => {
-            console.log("Key of song:", song.key);
-
             const url = song.youtubeUrl ?? "";
-            setYoutubeUrl(song.youtubeUrl ?? "");
+            setYoutubeUrl(url);
             setMenuOpen(false);
             analyze(url);
           }}
@@ -116,15 +108,23 @@ function App() {
           setScaleType={setScaleType}
           youtubeUrl={youtubeUrl}
           setYoutubeUrl={setYoutubeUrl}
-          onAnalyze={async () => {
-            await analyze(youtubeUrl);
-            refresh();
-          }}
+          onAnalyze={() => analyze(youtubeUrl)}
           loading={loading}
           theme={theme}
           setTheme={setTheme}
         />
       </div>
+
+      <ProgressionPanel
+        root={root}
+        progressionId={progressionId}
+        selectedChordIdx={selectedChordIdx}
+        onChangeProgression={(id) => {
+          setProgressionId(id);
+          setSelectedChordIdx(null);
+        }}
+        onSelectChord={setSelectedChordIdx}
+      />
 
       {/* Video */}
       {analysisData?.video_path && (
@@ -148,6 +148,7 @@ function App() {
             progress={progressToNext}
             currentChord={currentChord}
             nextChord={nextChord}
+            chordNotes={chordNotes}
           />
         </div>
       </div>

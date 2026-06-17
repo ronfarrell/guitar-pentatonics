@@ -10,6 +10,7 @@ export type SavedSong = {
   title: string;
   youtubeUrl: string;
   key: string;
+  createdAt?: string;
 };
 
 const API_BASE_URL =

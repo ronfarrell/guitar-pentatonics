@@ -1,5 +1,5 @@
 import { ROOT_NOTES } from "../theory/notes";
-import { SCALE_TYPES } from "../theory/scales";
+import { SCALE_TYPES, TRIAD_TYPES } from "../theory/scales";
 import type { NoteName } from "../theory/notes";
 import type { ScaleType } from "../theory/scales";
 
@@ -53,11 +53,20 @@ export default function Controls({
           value={scaleType}
           onChange={(e) => setScaleType(e.target.value as ScaleType)}
         >
-          {SCALE_TYPES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
+          <optgroup label="Scales">
+            {SCALE_TYPES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Triads">
+            {TRIAD_TYPES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </optgroup>
         </select>
       </div>
 
