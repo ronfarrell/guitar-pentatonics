@@ -1,5 +1,5 @@
 """Main analysis orchestration service"""
-from app.models.analysis import AnalysisRequest, AnalysisResult, Chord
+from app.models.analysis import AnalysisRequest, AnalysisResult
 from app.services.download import download_youtube_audio, download_youtube_video
 from app.services.dsp import analyze_audio
 from app.services.storage import save_analysis, get_cached_analysis
@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-async def process_youtube_video(request: AnalysisRequest, job_id: str | None = None) -> AnalysisResult:
+async def process_youtube_video(request: AnalysisRequest, job_id: str | None = None, preserved_title: str | None = None) -> AnalysisResult:
     """
     Complete analysis pipeline with caching and progress tracking:
     1. Check if video already analyzed → return cached result
@@ -68,7 +68,7 @@ async def process_youtube_video(request: AnalysisRequest, job_id: str | None = N
             chords=analysis_data["chords"],
             audio_path=audio_path,
             video_path=video_path,
-            video_title=metadata.get("title")
+            video_title=metadata.get("title") or preserved_title
         )
         
         # Step 5: Store in database

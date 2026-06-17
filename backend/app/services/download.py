@@ -42,7 +42,7 @@ async def download_youtube_audio(
             logger.info(f"[DOWNLOAD] Cache hit: {cached_files[0]}")
             if progress_tracker:
                 progress_tracker.update("downloading", 100, "Using cached audio")
-            return str(cached_files[0])
+            return str(cached_files[0]), {}
 
         if progress_tracker:
             progress_tracker.update("downloading", 10, "Downloading audio...")
@@ -78,9 +78,6 @@ async def download_youtube_audio(
             metadata = json.loads(meta_proc.stdout.splitlines()[0])
 
         title = metadata.get("title")
-        uploader = metadata.get("uploader")
-        duration = metadata.get("duration")
-
         logger.warning(f"[YT-DLP META] title={title}")
 
         # -----------------------------

@@ -31,7 +31,9 @@ def _run_chord_detection(audio_path: str):
 
     hpcp = es.HPCP(
         size=36,
-        harmonics=0
+        harmonics=8,
+        normalized='unitMax',
+        weightType='cosine'
     )
 
     chord_detect = es.ChordsDetection()
@@ -80,7 +82,7 @@ def _to_timeline(chords, strengths, hop_size, sr, min_confidence=0.3):
     start = 0.0
 
     change_counter = 0
-    change_threshold = 3  # stability filter (key improvement)
+    change_threshold = 2  # stability filter — lower catches faster chord changes
 
     for i, chord in enumerate(chords):
 
@@ -137,12 +139,12 @@ async def analyze_audio(audio_path: str) -> dict:
     timeline = _to_timeline(chords, strengths, hop_size, sr)
 
     # 🔥 merge micro-segments AFTER timeline creation
-    timeline = merge_short_segments(timeline, min_duration=1.0)
+    timeline = merge_short_segments(timeline, min_duration=0.5)
 
     # =========================
     # KEY DETECTION
     # =========================
-    key_extractor = es.KeyExtractor()
+    key_extractor = es.KeyExtractor(profileType='bgate')
 
     audio = es.MonoLoader(filename=audio_path, sampleRate=sr)()
     key, scale, strength = key_extractor(audio)

@@ -35,9 +35,9 @@ function App() {
   const [progressionId, setProgressionId] = useState<string | null>(null);
   const [selectedChordIdx, setSelectedChordIdx] = useState<number | null>(null);
 
-  const { savedSongs, deleteSong, refresh } = useSavedSongs();
+  const { savedSongs, deleteSong, startReanalyze, clearReanalyzingId, reanalyzingId, refresh } = useSavedSongs();
 
-  const { analysisData, loading, error, analyze } = useChordAnalysis(refresh);
+  const { analysisData, loading, error, analyze, analyzeWithJobId } = useChordAnalysis(refresh);
 
   const { videoRef, currentChord, nextChord, progressToNext } =
     useChordTracker(analysisData);
@@ -72,16 +72,17 @@ function App() {
           Visualize scales, analyze solos, and map fretboard patterns instantly
         </p>
       </header>
-      {/* Hamburger */}
-      <button
-        className="hamburger"
-        onClick={() => setMenuOpen((prev) => !prev)}
-      >
-        ☰
-      </button>
-
-      {/* Drawer */}
+      {/* Drawer — hamburger lives inside so they're one combined element */}
       <div className={`sidebar-drawer ${menuOpen ? "open" : ""}`}>
+        <button
+          className="hamburger"
+          onClick={() => setMenuOpen((prev) => !prev)}
+        >
+          {menuOpen ? "✕" : "☰"}
+        </button>
+
+        <span className="drawer-collapsed-label">Saved Songs</span>
+
         <SavedSongs
           songs={savedSongs}
           onSelectSong={(song) => {
@@ -91,6 +92,14 @@ function App() {
             analyze(url);
           }}
           onDeleteSong={deleteSong}
+          onReanalyzeSong={async (song) => {
+            const result = await startReanalyze(song);
+            if (!result) return;
+            setYoutubeUrl(result.youtube_url);
+            setMenuOpen(false);
+            analyzeWithJobId(result.job_id, result.youtube_url, clearReanalyzingId);
+          }}
+          reanalyzingId={reanalyzingId}
         />
       </div>
 

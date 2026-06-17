@@ -46,4 +46,16 @@ export const savedSongsService = {
       throw new Error(`Failed to delete song: ${res.status}`);
     }
   },
+
+  async reanalyze(id: string): Promise<{ job_id: string; youtube_url: string }> {
+    const res = await fetch(`${API_BASE_URL}/songs/${id}/reanalyze`, {
+      method: "POST",
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to start reanalysis: ${res.status}`);
+    }
+
+    return res.json();
+  },
 };

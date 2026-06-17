@@ -7,9 +7,11 @@ type Props = {
   songs: SavedSong[];
   onSelectSong?: (song: SavedSong) => void;
   onDeleteSong?: (id: string) => void;
+  onReanalyzeSong?: (song: SavedSong) => void;
+  reanalyzingId?: string | null;
 };
 
-function SavedSongs({ songs, onSelectSong, onDeleteSong }: Props) {
+function SavedSongs({ songs, onSelectSong, onDeleteSong, onReanalyzeSong, reanalyzingId }: Props) {
   const [query, setQuery] = useState("");
 
   const filteredSongs = songs.filter((song) =>
@@ -32,23 +34,40 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong }: Props) {
         <div className="empty-state">No saved songs yet.</div>
       ) : (
         <ul className="song-list">
-          {filteredSongs.map((song) => (
-            <li key={song.id} className="song-item">
-              <div className="song-info" onClick={() => onSelectSong?.(song)}>
-                <div className="song-title">{song.title}</div>
-                {song.key && <div className="song-key">{song.key}</div>}
-              </div>
+          {filteredSongs.map((song) => {
+            const isReanalyzing = reanalyzingId === song.id;
+            return (
+              <li key={song.id} className="song-item">
+                <div className="song-info" onClick={() => onSelectSong?.(song)}>
+                  <div className="song-title">{song.title}</div>
+                  {song.key && <div className="song-key">{song.key}</div>}
+                </div>
 
-              {onDeleteSong && (
-                <button
-                  className="delete-btn"
-                  onClick={() => onDeleteSong(song.id)}
-                >
-                  ✕
-                </button>
-              )}
-            </li>
-          ))}
+                <div className="song-actions">
+                  {onReanalyzeSong && (
+                    <button
+                      className="reanalyze-btn"
+                      onClick={() => onReanalyzeSong(song)}
+                      disabled={isReanalyzing}
+                      title="Reanalyze"
+                    >
+                      {isReanalyzing ? "..." : "⟳"}
+                    </button>
+                  )}
+
+                  {onDeleteSong && (
+                    <button
+                      className="delete-btn"
+                      onClick={() => onDeleteSong(song.id)}
+                      title="Delete"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

@@ -187,6 +187,46 @@ def get_analysis(record_id: int) -> AnalysisResult | None:
     return AnalysisResult(key=key, chords=chords, audio_path=audio_path, video_path=video_path)
 
 
+def delete_analysis_by_id(song_id: int) -> tuple[str | None, str | None]:
+    """Delete a song from DB and return (audio_path, video_path) for file cleanup."""
+    init_db()
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT audio_path, video_path FROM analyses WHERE id = ?", (song_id,))
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        return None, None
+
+    audio_path, video_path = row
+    cursor.execute("DELETE FROM analyses WHERE id = ?", (song_id,))
+    conn.close()
+
+    return audio_path, video_path
+
+
+def clear_cache_for_reanalyze(song_id: int) -> tuple[str | None, str | None]:
+    """Delete only the DB record for a song and return (youtube_url, video_title) so the caller can restart analysis."""
+    init_db()
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT youtube_url, video_title FROM analyses WHERE id = ?", (song_id,))
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        return None, None
+
+    youtube_url, video_title = row
+    cursor.execute("DELETE FROM analyses WHERE id = ?", (song_id,))
+    conn.close()
+
+    return youtube_url, video_title
+
+
 def list_all_analyses(limit: int = 100):
     """List all analysis results from the database"""
     init_db()
