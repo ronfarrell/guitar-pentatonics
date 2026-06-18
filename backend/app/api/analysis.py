@@ -94,16 +94,23 @@ async def stream_analysis_progress(job_id: str):
         };
     """
     async def progress_generator():
+        import time
+        last_keepalive = time.monotonic()
         try:
             while True:
                 progress = get_progress(job_id)
                 if progress:
                     yield f"data: {json.dumps(progress)}\n\n"
                     if progress["status"] in ["completed", "error"]:
+                        cleanup_progress(job_id)
                         break
-                await asyncio.sleep(0.5)  # Poll every 500ms
-        finally:
-            cleanup_progress(job_id)
+                now = time.monotonic()
+                if now - last_keepalive >= 15:
+                    yield ": keepalive\n\n"
+                    last_keepalive = now
+                await asyncio.sleep(0.5)
+        except (asyncio.CancelledError, GeneratorExit):
+            pass  # Client disconnected — don't clean up, job is still running
     
     return StreamingResponse(
         progress_generator(),

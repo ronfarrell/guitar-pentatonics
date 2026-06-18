@@ -200,15 +200,17 @@ async def download_youtube_video(youtube_url: str, progress_tracker: ProgressTra
         ]
 
         logger.info(f"[VIDEO] Running yt-dlp...")
-        
-        # Run with timeout to prevent hanging
-        proc = await asyncio.to_thread(
-            subprocess.run,
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=env
+
+        proc = await asyncio.wait_for(
+            asyncio.to_thread(
+                subprocess.run,
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env
+            ),
+            timeout=600
         )
 
         logger.info(f"[VIDEO] Process completed with return code: {proc.returncode}")

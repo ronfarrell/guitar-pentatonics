@@ -460,6 +460,185 @@ h3 {
 }
 
 /* =========================
+   PLAYLISTS
+========================= */
+
+.saved-songs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.new-playlist-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.new-playlist-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.playlist-folder {
+  display: flex;
+  flex-direction: column;
+}
+
+.playlist-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.playlist-header:hover {
+  background: var(--surface-strong);
+}
+
+.playlist-header.playlist-drag-over {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.playlist-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  min-width: 0;
+}
+
+.playlist-chevron {
+  color: var(--muted);
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.playlist-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playlist-name-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--accent);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  outline: none;
+  min-width: 0;
+}
+
+.playlist-count {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-left: auto;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.playlist-songs {
+  list-style: none;
+  margin: 2px 0 4px;
+  padding: 0 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.playlist-empty {
+  padding: 8px 12px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: italic;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.songs-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.songs-divider::before,
+.songs-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.songs-divider--drag-over {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.remove-from-playlist-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.remove-from-playlist-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.song-item[draggable="true"] {
+  cursor: grab;
+}
+
+.song-item[draggable="true"]:active {
+  cursor: grabbing;
+  opacity: 0.7;
+}
+
+/* =========================
    CONTROLS
 ========================= */
 
@@ -963,8 +1142,127 @@ select:focus,
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
-  align-items: baseline;
+  align-items: center;
   margin-bottom: 16px;
+}
+
+/* Settings gear button */
+.fb-settings-anchor {
+  position: relative;
+  margin-left: auto;
+}
+
+.fb-settings-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 5px 8px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.fb-settings-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Settings popup */
+.fb-settings-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 100;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fb-settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.fb-settings-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.fb-settings-close:hover {
+  color: var(--text);
+}
+
+.fb-settings-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fb-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.fb-settings-row:hover {
+  color: var(--text);
+}
+
+.fb-settings-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.fb-settings-row input[type="color"] {
+  margin-left: auto;
+  width: 32px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px;
+  cursor: pointer;
+  background: var(--surface);
+}
+
+.fb-settings-reset {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  text-align: center;
+  transition: all 0.15s;
+  width: 100%;
+}
+
+.fb-settings-reset:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .fretboard-label {
@@ -1037,27 +1335,15 @@ select:focus,
 }
 
 .scale-note {
-  background: var(--accent-soft);
-  color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent-border);
-}
-
-:root[data-theme="dark"] .scale-note {
-  background: rgba(139, 127, 247, 0.18);
-  color: #b5adff;
-  box-shadow: inset 0 0 0 1px rgba(139, 127, 247, 0.35);
+  background: color-mix(in srgb, var(--fb-scale) 15%, transparent);
+  color: var(--fb-scale);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fb-scale) 30%, transparent);
 }
 
 .root-note {
-  background: rgba(34, 197, 94, 0.14);
-  color: #16a34a;
-  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.25);
-}
-
-:root[data-theme="dark"] .root-note {
-  background: rgba(34, 197, 94, 0.2);
-  color: #86efac;
-  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.35);
+  background: color-mix(in srgb, var(--fb-root) 15%, transparent);
+  color: var(--fb-root);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fb-root) 30%, transparent);
 }
 
 /* =========================
@@ -1182,24 +1468,14 @@ select:focus,
 ========================= */
 
 .chord-tone {
-  background: rgba(234, 88, 12, 0.12);
-  color: #c2410c;
-  box-shadow: inset 0 0 0 1px rgba(234, 88, 12, 0.25);
-}
-
-:root[data-theme="dark"] .chord-tone {
-  background: rgba(251, 146, 60, 0.2);
-  color: #fb923c;
-  box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.35);
+  background: color-mix(in srgb, var(--fb-triad) 15%, transparent);
+  color: var(--fb-triad);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fb-triad) 30%, transparent);
 }
 
 .chord-tone-label {
-  color: #c2410c;
+  color: var(--fb-triad);
   font-weight: 700;
-}
-
-:root[data-theme="dark"] .chord-tone-label {
-  color: #fb923c;
 }
 
 /* =========================

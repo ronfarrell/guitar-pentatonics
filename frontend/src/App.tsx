@@ -22,6 +22,8 @@ import { useMediaControls } from "./hooks/useMediaControls";
 import { isTriadType } from "./theory/scales";
 import { PROGRESSIONS, CUSTOM_PROGRESSION_ID, getChordRoot, type ProgressionChord } from "./theory/progressions";
 import ProgressionPanel from "./components/ProgressionPanel";
+import { loadFretboardColors } from "./components/FretboardColorSettings";
+import type { FretboardColors } from "./components/FretboardColorSettings";
 
 function extractRoot(chord: string | null): NoteName | null {
   return chord?.match(/^[A-G](#|b)?/)?.[0] as NoteName | null;
@@ -41,10 +43,11 @@ function App() {
   const [selectedChordIdx, setSelectedChordIdx] = useState<number | null>(null);
   const [showTriads, setShowTriads] = useState(false);
   const [customChords, setCustomChords] = useState<ProgressionChord[]>([]);
+  const [fretboardColors, setFretboardColors] = useState<FretboardColors>(loadFretboardColors);
 
   const { savedSongs, deleteSong, startReanalyze, clearReanalyzingId, reanalyzingId, refresh } = useSavedSongs();
 
-  const { analysisData, loading, error, analyze, analyzeWithJobId } = useChordAnalysis(refresh);
+  const { analysisData, loading, error, analyze, loadCached, analyzeWithJobId } = useChordAnalysis(refresh);
 
   const { videoRef, prevChord, currentChord, nextChord, progressToNext } =
     useChordTracker(analysisData);
@@ -171,7 +174,7 @@ function App() {
               const url = song.youtubeUrl ?? "";
               setYoutubeUrl(url);
               setMenuOpen(false);
-              analyze(url);
+              loadCached(url);
             }}
             onDeleteSong={deleteSong}
             onReanalyzeSong={async (song) => {
@@ -249,6 +252,8 @@ function App() {
               currentChord={currentChord}
               nextChord={nextChord}
               chordNotes={chordNotes}
+              colors={fretboardColors}
+              onColorsChange={setFretboardColors}
             />
           </div>
         </div>

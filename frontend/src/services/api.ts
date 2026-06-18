@@ -1,5 +1,7 @@
 // Environment configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Empty string = relative URLs, used in Docker where nginx proxies API routes to the backend.
+// Falls back to localhost:8000 for local dev without a .env.local file.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
 // Response types (shared with backend responses)
 export type HealthResponse = {

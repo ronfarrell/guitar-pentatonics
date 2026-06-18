@@ -6,6 +6,8 @@ import {
 } from "../theory/fretboard";
 import { getScaleNotes } from "../theory/scales";
 import type { ScaleType } from "../theory/scales";
+import FretboardColorSettings from "./FretboardColorSettings";
+import type { FretboardColors } from "./FretboardColorSettings";
 
 type FretboardProps = {
   root: string;
@@ -15,6 +17,8 @@ type FretboardProps = {
   currentChord: string | null;
   nextChord: string | null;
   chordNotes?: string[];
+  colors: FretboardColors;
+  onColorsChange: (colors: FretboardColors) => void;
 };
 
 const Fretboard = ({
@@ -25,6 +29,8 @@ const Fretboard = ({
   currentChord,
   nextChord,
   chordNotes,
+  colors,
+  onColorsChange,
 }: FretboardProps) => {
   const fretboard = useMemo(() => buildFretboard(FRET_COUNT), []);
 
@@ -40,7 +46,6 @@ const Fretboard = ({
 
   const showChordCards = prevChord !== null || currentChord !== null || nextChord !== null;
 
-  // Increment key on each chord change to restart the slide-in animation
   const [chordAnimKey, setChordAnimKey] = useState(0);
   const prevChordRef = useRef(currentChord);
   useEffect(() => {
@@ -50,8 +55,16 @@ const Fretboard = ({
     }
   }, [currentChord]);
 
+  const [showSettings, setShowSettings] = useState(false);
+
+  const cssVars = {
+    "--fb-root": colors.rootColor,
+    "--fb-triad": colors.triadColor,
+    "--fb-scale": colors.scaleColor,
+  } as React.CSSProperties;
+
   return (
-    <section className="fretboard-card">
+    <section className="fretboard-card" style={cssVars}>
       {/* HEADER */}
       <div className="fretboard-title">
         <div>
@@ -76,6 +89,24 @@ const Fretboard = ({
             </>
           ) : (
             <span>Highlight: {scaleNotes.join(" • ")}</span>
+          )}
+        </div>
+
+        <div className="fb-settings-anchor">
+          <button
+            className="fb-settings-btn"
+            onClick={() => setShowSettings((s) => !s)}
+            aria-label="Fretboard color settings"
+            title="Color settings"
+          >
+            ⚙
+          </button>
+          {showSettings && (
+            <FretboardColorSettings
+              colors={colors}
+              onChange={onColorsChange}
+              onClose={() => setShowSettings(false)}
+            />
           )}
         </div>
       </div>
