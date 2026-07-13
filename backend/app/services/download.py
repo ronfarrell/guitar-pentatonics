@@ -190,11 +190,15 @@ async def download_youtube_video(youtube_url: str, progress_tracker: ProgressTra
         output_template = str(cache_dir / "video.%(ext)s")
         logger.info(f"[VIDEO] Output template: {output_template}")
 
+        # "best[ext=mp4]" only picks YouTube's pre-merged mp4, which is capped
+        # around 360p. Download the best separate video+audio streams (up to
+        # 1080p) and let ffmpeg merge them into an mp4 instead.
         cmd = [
             "yt-dlp",
             "--quiet",
             "--no-warnings",
-            "-f", "best[ext=mp4]",  # Best quality MP4
+            "-f", "bestvideo[vcodec^=avc1][height<=1080]+bestaudio[ext=m4a]/bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[ext=mp4]/best",
+            "--merge-output-format", "mp4",
             "-o", output_template,
             youtube_url,
         ]

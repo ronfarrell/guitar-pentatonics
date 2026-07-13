@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from app.services.storage import list_all_analyses, delete_analysis_by_id, clear_cache_for_reanalyze
+from app.services.download import VIDEO_DIR, get_video_id_from_url
 from app.services.analysis import process_youtube_video
 from app.models.analysis import AnalysisRequest
 
@@ -68,6 +69,14 @@ async def reanalyze_song(song_id: int):
 
     if not youtube_url:
         raise HTTPException(status_code=404, detail="Song not found")
+
+    # Drop the cached video so reanalysis re-downloads it (e.g. at a higher
+    # quality than the originally cached file). Audio cache is kept — it
+    # doesn't affect playback quality and skipping it speeds up reanalysis.
+    video_cache_dir = VIDEO_DIR / get_video_id_from_url(youtube_url)
+    if video_cache_dir.exists():
+        shutil.rmtree(video_cache_dir, ignore_errors=True)
+        logger.info(f"[REANALYZE] Cleared cached video: {video_cache_dir}")
 
     job_id = str(uuid.uuid4())
     logger.info(f"[REANALYZE] Starting job {job_id} for song {song_id}: {youtube_url}")

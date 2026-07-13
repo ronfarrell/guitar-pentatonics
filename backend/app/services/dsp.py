@@ -4,6 +4,7 @@ import logging
 import numpy as np
 import essentia.standard as es
 from app.models.analysis import Chord
+from app.services.theory import refine_key
 from collections import deque
 
 logger = logging.getLogger(__name__)
@@ -155,8 +156,12 @@ async def analyze_audio(audio_path: str) -> dict:
     audio = es.MonoLoader(filename=audio_path, sampleRate=sr)()
     key, scale, strength = key_extractor(audio)
 
+    # Cross-check the chroma-based key against the chord timeline — this
+    # mainly fixes relative major/minor confusions (e.g. C major vs A minor).
+    refined_key = refine_key(key, scale, timeline)
+
     result = {
-        "key": f"{key} {scale}",
+        "key": refined_key,
         "chords": timeline,
     }
 

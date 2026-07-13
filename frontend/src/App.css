@@ -797,16 +797,43 @@ select:focus,
   box-shadow: 0 2px 8px rgba(139, 127, 247, 0.4);
 }
 
+/* Row above the fretboard: mode toggle + key/scale/triads controls */
+.fret-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.fret-controls-row .fret-mode-toggle {
+  margin-bottom: 3px;
+}
+
+.inline-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.inline-controls .control-group {
+  min-width: 110px;
+}
+
+.inline-controls select {
+  padding: 8px 12px;
+}
+
+.inline-controls .toggle-btn {
+  width: auto;
+  padding: 8px 18px;
+}
+
 .song-key-btn {
-  border-style: dashed !important;
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.song-key-btn:hover {
-  border-color: var(--accent) !important;
-  color: var(--accent);
 }
 
 .song-key-badge {
@@ -816,6 +843,74 @@ select:focus,
   padding: 1px 6px;
   font-size: 0.8rem;
   font-weight: 700;
+}
+
+.fret-mode-toggle button.active .song-key-badge {
+  background: rgba(255, 255, 255, 0.22);
+  color: white;
+}
+
+select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =========================
+   ANALYSIS SUGGESTIONS
+========================= */
+
+.suggestion-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.suggestion-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+.suggestion-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.suggestion-chip:hover:not(.active) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.suggestion-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.suggestion-row--progression {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+}
+
+.detected-numerals {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.detected-match {
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 /* =========================
@@ -1209,6 +1304,51 @@ select:focus,
   color: var(--text);
 }
 
+.fb-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.fb-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.fb-preset:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.fb-preset.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-border);
+  color: var(--text);
+}
+
+.fb-preset-swatches {
+  display: flex;
+  gap: 3px;
+}
+
+.fb-preset-swatches span {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
 .fb-settings-rows {
   display: flex;
   flex-direction: column;
@@ -1346,6 +1486,18 @@ select:focus,
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fb-root) 30%, transparent);
 }
 
+/* pentatonic notes embedded in the current scale */
+.pentatonic-note {
+  background: color-mix(in srgb, var(--fb-pent) 15%, transparent);
+  color: var(--fb-pent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fb-pent) 30%, transparent);
+}
+
+.pentatonic-label {
+  color: var(--fb-pent);
+  font-weight: 600;
+}
+
 /* =========================
    PROGRESSION PANEL
 ========================= */
@@ -1359,11 +1511,6 @@ select:focus,
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-.below-fretboard-card .controls-panel {
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 16px;
 }
 
 .progression-panel {
@@ -1801,6 +1948,19 @@ select:focus,
 @media (max-width: 860px) {
   .controls-panel {
     grid-template-columns: 1fr;
+  }
+
+  .fret-controls-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fret-controls-row .fret-mode-toggle {
+    margin-bottom: 0;
+  }
+
+  .inline-controls .control-group {
+    flex: 1;
   }
 
   .chord-sidebar {

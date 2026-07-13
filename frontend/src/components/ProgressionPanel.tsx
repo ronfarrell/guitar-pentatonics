@@ -6,17 +6,16 @@ import {
   type ProgressionChord,
 } from "../theory/progressions";
 import CustomProgressionBuilder from "./CustomProgressionBuilder";
+import type { FretMode } from "./FretModeToggle";
 
 type Props = {
   root: NoteName;
   progressionId: string | null;
   selectedChordIdx: number | null;
-  showTriads: boolean;
-  fretMode: "manual" | "live";
+  fretMode: FretMode;
   customChords: ProgressionChord[];
   onChangeProgression: (id: string | null) => void;
   onSelectChord: (idx: number | null) => void;
-  onToggleTriads: () => void;
   onUpdateCustomChords: (chords: ProgressionChord[]) => void;
 };
 
@@ -24,12 +23,10 @@ export default function ProgressionPanel({
   root,
   progressionId,
   selectedChordIdx,
-  showTriads,
   fretMode,
   customChords,
   onChangeProgression,
   onSelectChord,
-  onToggleTriads,
   onUpdateCustomChords,
 }: Props) {
   const isCustom = progressionId === CUSTOM_PROGRESSION_ID;
@@ -59,16 +56,6 @@ export default function ProgressionPanel({
             <option value={CUSTOM_PROGRESSION_ID}>✏ Build Custom...</option>
           </select>
         </div>
-
-        <div className="control-group" style={{ flexShrink: 0 }}>
-          <label>Triads</label>
-          <button
-            className={`toggle-btn${showTriads ? " toggle-btn--on" : ""}`}
-            onClick={onToggleTriads}
-          >
-            {showTriads ? "On" : "Off"}
-          </button>
-        </div>
       </div>
 
       {isCustom && (
@@ -81,7 +68,7 @@ export default function ProgressionPanel({
 
       {activeChords.length > 0 && (
         <div className="progression-chords">
-          {fretMode === "manual" && (
+          {fretMode !== "live" && (
             <span className="progression-hint">← → to cycle</span>
           )}
           {activeChords.map((chord, i) => {

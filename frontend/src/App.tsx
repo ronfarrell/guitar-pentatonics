@@ -6,6 +6,7 @@ import Controls from "./components/Controls";
 import VideoPlayer from "./components/VideoPlayer";
 import ChordSidebar from "./components/ChordSidebar";
 import FretModeToggle from "./components/FretModeToggle";
+import type { FretMode } from "./components/FretModeToggle";
 import SavedSongs from "./components/SavedSongs";
 import MediaBar from "./components/MediaBar";
 import MiniPlayer from "./components/MiniPlayer";
@@ -19,11 +20,14 @@ import { useChordAnalysis } from "./hooks/useChordAnalysis";
 import { useChordTracker } from "./hooks/useChordTracker";
 import { useSavedSongs } from "./hooks/useSavedSongs";
 import { useMediaControls } from "./hooks/useMediaControls";
-import { isTriadType } from "./theory/scales";
+import { isTriadType, matchScaleToKeyQuality } from "./theory/scales";
+import { suggestScales, detectProgression } from "./theory/analysis";
 import { PROGRESSIONS, CUSTOM_PROGRESSION_ID, getChordRoot, type ProgressionChord } from "./theory/progressions";
 import ProgressionPanel from "./components/ProgressionPanel";
 import { loadFretboardColors } from "./components/FretboardColorSettings";
 import type { FretboardColors } from "./components/FretboardColorSettings";
+import { loadPlaybackSession, savePlaybackSession } from "./services/sessionStore";
+import type { PlaybackSession } from "./services/sessionStore";
 
 function extractRoot(chord: string | null): NoteName | null {
   return chord?.match(/^[A-G](#|b)?/)?.[0] as NoteName | null;
@@ -33,9 +37,11 @@ function App() {
   const [root, setRoot] = useState<NoteName>(ROOT_NOTES[0]);
   const [scaleType, setScaleType] = useState<ScaleType>("Major Pentatonic");
   const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [fretMode, setFretMode] = useState<"manual" | "live">("manual");
+  const [fretMode, setFretMode] = useState<FretMode>("manual");
 
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<"dark" | "light">(() =>
+    localStorage.getItem("theme") === "light" ? "light" : "dark",
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const [chordOpen, setChordOpen] = useState(false);
 
@@ -47,7 +53,7 @@ function App() {
 
   const { savedSongs, deleteSong, startReanalyze, clearReanalyzingId, reanalyzingId, refresh } = useSavedSongs();
 
-  const { analysisData, loading, error, analyze, loadCached, analyzeWithJobId } = useChordAnalysis(refresh);
+  const { analysisData, loadedUrl, loading, error, analyze, loadCached, analyzeWithJobId } = useChordAnalysis(refresh);
 
   const { videoRef, prevChord, currentChord, nextChord, progressToNext } =
     useChordTracker(analysisData);
@@ -57,6 +63,56 @@ function App() {
     : null;
 
   const mediaControls = useMediaControls(videoRef, videoSrc);
+
+  // Restore the last session (song + position) once on mount
+  const resumeRef = useRef<PlaybackSession | null>(null);
+  useEffect(() => {
+    const saved = loadPlaybackSession();
+    if (!saved) return;
+    resumeRef.current = saved;
+    setYoutubeUrl(saved.youtubeUrl);
+    loadCached(saved.youtubeUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist playback position, and seek to the restored one when its video loads
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoSrc || !loadedUrl) return;
+
+    const resume = resumeRef.current;
+    if (resume) {
+      // only resume into the same song; a different selection drops it
+      if (resume.youtubeUrl === loadedUrl) {
+        const apply = () => {
+          video.currentTime = resume.time;
+        };
+        if (video.readyState >= 1) apply();
+        else video.addEventListener("loadedmetadata", apply, { once: true });
+      }
+      resumeRef.current = null;
+    }
+
+    let lastSaved = -Infinity;
+    const saveThrottled = () => {
+      if (Math.abs(video.currentTime - lastSaved) < 3) return;
+      lastSaved = video.currentTime;
+      savePlaybackSession({ youtubeUrl: loadedUrl, time: video.currentTime });
+    };
+    const saveNow = () =>
+      savePlaybackSession({ youtubeUrl: loadedUrl, time: video.currentTime });
+
+    video.addEventListener("timeupdate", saveThrottled);
+    video.addEventListener("seeked", saveNow);
+    video.addEventListener("pause", saveNow);
+    window.addEventListener("pagehide", saveNow);
+    return () => {
+      video.removeEventListener("timeupdate", saveThrottled);
+      video.removeEventListener("seeked", saveNow);
+      video.removeEventListener("pause", saveNow);
+      window.removeEventListener("pagehide", saveNow);
+    };
+  }, [videoSrc, loadedUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // track whether the main video card is visible in the viewport
   const videoSectionRef = useRef<HTMLDivElement>(null);
@@ -78,6 +134,22 @@ function App() {
 
   const liveRoot = extractRoot(currentChord);
 
+  const songRoot = extractRoot(analysisData?.key ?? null);
+  const songIsMinor = /minor/i.test(analysisData?.key ?? "");
+
+  const suggestedScales = useMemo(
+    () => (analysisData ? suggestScales(analysisData.key, analysisData.chords) : []),
+    [analysisData],
+  );
+  const detectedProgression = useMemo(
+    () => (analysisData ? detectProgression(analysisData.key, analysisData.chords) : null),
+    [analysisData],
+  );
+
+  // In song mode the analyzed song's key drives the fretboard (and
+  // progressions); otherwise the manually selected key does.
+  const baseRoot: NoteName = fretMode === "song" && songRoot ? songRoot : root;
+
   const selectedProgressionChord = useMemo(() => {
     if (progressionId === null || selectedChordIdx === null) return null;
     const chords =
@@ -90,9 +162,9 @@ function App() {
   const fretRoot: NoteName = useMemo(() => {
     if (fretMode === "live" && liveRoot) return liveRoot;
     if (selectedProgressionChord)
-      return getChordRoot(root, selectedProgressionChord) as NoteName;
-    return root;
-  }, [fretMode, liveRoot, selectedProgressionChord, root]);
+      return getChordRoot(baseRoot, selectedProgressionChord) as NoteName;
+    return baseRoot;
+  }, [fretMode, liveRoot, selectedProgressionChord, baseRoot]);
 
   const fretScaleType: ScaleType = useMemo(() => {
     if (fretMode === "live") {
@@ -105,8 +177,10 @@ function App() {
       return selectedProgressionChord.quality === "minor"
         ? "Minor Pentatonic"
         : "Major Pentatonic";
+    if (fretMode === "song" && songRoot)
+      return matchScaleToKeyQuality(scaleType, songIsMinor);
     return scaleType;
-  }, [fretMode, currentChord, selectedProgressionChord, scaleType]);
+  }, [fretMode, currentChord, selectedProgressionChord, scaleType, songRoot, songIsMinor]);
 
   const chordNotes = useMemo(() => {
     if (!showTriads) return undefined;
@@ -118,6 +192,7 @@ function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    localStorage.setItem("theme", theme);
   }, [theme]);
 
   const progressionLen =
@@ -128,7 +203,7 @@ function App() {
         : (PROGRESSIONS.find((p) => p.id === progressionId)?.chords.length ?? 0);
 
   useEffect(() => {
-    if (fretMode !== "manual" || progressionId === null || progressionLen === 0) return;
+    if (fretMode === "live" || progressionId === null || progressionLen === 0) return;
     const len = progressionLen;
 
     function onKey(e: KeyboardEvent) {
@@ -227,19 +302,73 @@ function App() {
           )}
         </div>
 
-        <FretModeToggle
-          mode={fretMode}
-          setMode={setFretMode}
-          songKey={analysisData?.key ?? null}
-          onUseSongKey={() => {
-            const raw = analysisData?.key ?? "";
-            const rootNote = raw.match(/^[A-G](#|b)?/)?.[0] as NoteName | undefined;
-            if (rootNote) setRoot(rootNote);
-            setFretMode("manual");
-            setProgressionId(null);
-            setSelectedChordIdx(null);
-          }}
-        />
+        <div className="fret-controls-row">
+          <FretModeToggle
+            mode={fretMode}
+            setMode={setFretMode}
+            songKey={analysisData?.key ?? null}
+          />
+
+          <div className="inline-controls">
+            <div className="control-group">
+              <label>{fretMode === "song" && songRoot ? "Key (song)" : "Key"}</label>
+              <select
+                value={baseRoot}
+                disabled={fretMode === "song" && !!songRoot}
+                title={fretMode === "song" && songRoot ? "Key follows the analyzed song" : undefined}
+                onChange={(e) => setRoot(e.target.value as NoteName)}
+              >
+                {ROOT_NOTES.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="control-group">
+              <label>Scale</label>
+              <select value={scaleType} onChange={(e) => setScaleType(e.target.value as ScaleType)}>
+                <optgroup label="Scales">
+                  {SCALE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </optgroup>
+                <optgroup label="Triads">
+                  {TRIAD_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </optgroup>
+              </select>
+            </div>
+
+            <div className="control-group">
+              <label>Triads</label>
+              <button
+                className={`toggle-btn${showTriads ? " toggle-btn--on" : ""}`}
+                onClick={() => setShowTriads((v) => !v)}
+              >
+                {showTriads ? "On" : "Off"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {suggestedScales.length > 0 && (
+          <div className="suggestion-row">
+            <span className="suggestion-label">Suggested scales</span>
+            {suggestedScales.map((s) => {
+              const active = baseRoot === s.root && scaleType === s.scale;
+              return (
+                <button
+                  key={s.scale}
+                  className={`suggestion-chip${active ? " active" : ""}`}
+                  title={s.reason}
+                  onClick={() => {
+                    setRoot(s.root);
+                    setScaleType(s.scale);
+                  }}
+                >
+                  {s.root} {s.scale}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Fretboard */}
         <div className="main-grid">
@@ -258,49 +387,50 @@ function App() {
           </div>
         </div>
 
-        {/* Key, Scale, and Progression — below fretboard */}
+        {/* Progression — below fretboard */}
         <div className="below-fretboard-card">
-          <div className="controls-panel">
-            <div className="control-group">
-              <label>Key</label>
-              <select value={root} onChange={(e) => setRoot(e.target.value as NoteName)}>
-                {ROOT_NOTES.map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
+          {detectedProgression && (
+            <div className="suggestion-row suggestion-row--progression">
+              <span className="suggestion-label">Detected progression</span>
+              <span className="detected-numerals">
+                {detectedProgression.numerals.join(" – ")}
+              </span>
+              {detectedProgression.matchName && (
+                <span className="detected-match">≈ {detectedProgression.matchName}</span>
+              )}
+              <button
+                className="suggestion-chip"
+                onClick={() => {
+                  if (detectedProgression.matchId) {
+                    setProgressionId(detectedProgression.matchId);
+                  } else {
+                    setCustomChords(detectedProgression.chords);
+                    setProgressionId(CUSTOM_PROGRESSION_ID);
+                  }
+                  setSelectedChordIdx(null);
+                }}
+              >
+                Load
+              </button>
             </div>
-
-            <div className="control-group">
-              <label>Scale</label>
-              <select value={scaleType} onChange={(e) => setScaleType(e.target.value as ScaleType)}>
-                <optgroup label="Scales">
-                  {SCALE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </optgroup>
-                <optgroup label="Triads">
-                  {TRIAD_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </optgroup>
-              </select>
-            </div>
-          </div>
+          )}
 
           <ProgressionPanel
-          root={root}
-          progressionId={progressionId}
-          selectedChordIdx={selectedChordIdx}
-          customChords={customChords}
-          onChangeProgression={(id) => {
-            setProgressionId(id);
-            setSelectedChordIdx(null);
-          }}
-          onSelectChord={setSelectedChordIdx}
-          onUpdateCustomChords={(chords) => {
-            setCustomChords(chords);
-            setSelectedChordIdx(null);
-          }}
-          showTriads={showTriads}
-          fretMode={fretMode}
-          onToggleTriads={() => setShowTriads((v) => !v)}
-        />
+            root={baseRoot}
+            progressionId={progressionId}
+            selectedChordIdx={selectedChordIdx}
+            customChords={customChords}
+            onChangeProgression={(id) => {
+              setProgressionId(id);
+              setSelectedChordIdx(null);
+            }}
+            onSelectChord={setSelectedChordIdx}
+            onUpdateCustomChords={(chords) => {
+              setCustomChords(chords);
+              setSelectedChordIdx(null);
+            }}
+            fretMode={fretMode}
+          />
         </div>
 
         {error && <div className="error">{error}</div>}

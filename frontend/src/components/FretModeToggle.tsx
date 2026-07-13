@@ -1,11 +1,12 @@
+export type FretMode = "manual" | "song" | "live";
+
 type Props = {
-  mode: "manual" | "live";
-  setMode: (m: "manual" | "live") => void;
+  mode: FretMode;
+  setMode: (m: FretMode) => void;
   songKey?: string | null;
-  onUseSongKey?: () => void;
 };
 
-export default function FretModeToggle({ mode, setMode, songKey, onUseSongKey }: Props) {
+export default function FretModeToggle({ mode, setMode, songKey }: Props) {
   return (
     <div className="fret-mode-toggle">
       <button
@@ -15,8 +16,12 @@ export default function FretModeToggle({ mode, setMode, songKey, onUseSongKey }:
         Manual Key
       </button>
 
-      {songKey && onUseSongKey && (
-        <button className="song-key-btn" onClick={onUseSongKey} title={`Use song key: ${songKey}`}>
+      {songKey && (
+        <button
+          onClick={() => setMode("song")}
+          className={`song-key-btn${mode === "song" ? " active" : ""}`}
+          title={`Follow song key: ${songKey}`}
+        >
           Song Key <span className="song-key-badge">{songKey}</span>
         </button>
       )}

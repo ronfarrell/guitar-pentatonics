@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
-import {
-  buildFretboard,
-  FRET_COUNT,
-  STANDARD_TUNING,
-} from "../theory/fretboard";
-import { getScaleNotes } from "../theory/scales";
+import { buildFretboard, FRET_COUNT } from "../theory/fretboard";
+import { getScaleNotes, getPentatonicSubset } from "../theory/scales";
 import type { ScaleType } from "../theory/scales";
 import FretboardColorSettings from "./FretboardColorSettings";
 import type { FretboardColors } from "./FretboardColorSettings";
@@ -39,6 +35,16 @@ const Fretboard = ({
     [root, scaleType],
   );
 
+  // pentatonic embedded in the current scale (null for pentatonics/triads)
+  const pentatonicNotes = useMemo(
+    () => getPentatonicSubset(root, scaleType),
+    [root, scaleType],
+  );
+  const pentatonicSet = useMemo(
+    () => new Set(pentatonicNotes ?? []),
+    [pentatonicNotes],
+  );
+
   const chordNoteSet = useMemo(() => new Set(chordNotes ?? []), [chordNotes]);
 
   const rootNote = scaleNotes[0];
@@ -61,6 +67,7 @@ const Fretboard = ({
     "--fb-root": colors.rootColor,
     "--fb-triad": colors.triadColor,
     "--fb-scale": colors.scaleColor,
+    "--fb-pent": colors.pentatonicColor,
   } as React.CSSProperties;
 
   return (
@@ -88,7 +95,17 @@ const Fretboard = ({
               <span>Scale: {scaleNotes.join(" • ")}</span>
             </>
           ) : (
-            <span>Highlight: {scaleNotes.join(" • ")}</span>
+            <>
+              <span>Highlight: {scaleNotes.join(" • ")}</span>
+              {pentatonicNotes && (
+                <span>
+                  Pentatonic core:{" "}
+                  <span className="pentatonic-label">
+                    {pentatonicNotes.join(" • ")}
+                  </span>
+                </span>
+              )}
+            </>
           )}
         </div>
 
@@ -164,9 +181,11 @@ const Fretboard = ({
                 if (chordRoot) {
                   if (note === chordRoot) cls += " root-note";
                   else if (chordNoteSet.has(note)) cls += " chord-tone";
+                  else if (pentatonicSet.has(note)) cls += " pentatonic-note";
                   else if (scaleNotes.includes(note)) cls += " scale-note";
                 } else {
                   if (note === rootNote) cls += " root-note";
+                  else if (pentatonicSet.has(note)) cls += " pentatonic-note";
                   else if (scaleNotes.includes(note)) cls += " scale-note";
                 }
 

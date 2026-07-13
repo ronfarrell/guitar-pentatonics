@@ -31,6 +31,8 @@ export default function MiniPlayer({ videoRef, videoSrc, visible, playing, onTog
   const miniRef = useRef<HTMLVideoElement>(null);
   const [pos, setPos] = useState<Pos | null>(null);
   const dragging = useRef(false);
+  const moved = useRef(false);
+  const dragStart = useRef<Pos>({ x: 0, y: 0 });
   const dragOffset = useRef<Pos>({ x: 0, y: 0 });
 
   // Set initial position once the player first becomes visible
@@ -71,6 +73,11 @@ export default function MiniPlayer({ videoRef, videoSrc, visible, playing, onTog
   useEffect(() => {
     function onMove(e: MouseEvent) {
       if (!dragging.current) return;
+      if (
+        Math.abs(e.clientX - dragStart.current.x) > 4 ||
+        Math.abs(e.clientY - dragStart.current.y) > 4
+      )
+        moved.current = true;
       setPos({
         x: Math.max(0, Math.min(e.clientX - dragOffset.current.x, window.innerWidth - MINI_W)),
         y: Math.max(0, Math.min(e.clientY - dragOffset.current.y, window.innerHeight - MINI_H)),
@@ -94,6 +101,11 @@ export default function MiniPlayer({ videoRef, videoSrc, visible, playing, onTog
       if (!dragging.current) return;
       e.preventDefault();
       const t = e.touches[0];
+      if (
+        Math.abs(t.clientX - dragStart.current.x) > 4 ||
+        Math.abs(t.clientY - dragStart.current.y) > 4
+      )
+        moved.current = true;
       setPos({
         x: Math.max(0, Math.min(t.clientX - dragOffset.current.x, window.innerWidth - MINI_W)),
         y: Math.max(0, Math.min(t.clientY - dragOffset.current.y, window.innerHeight - MINI_H)),
@@ -110,18 +122,18 @@ export default function MiniPlayer({ videoRef, videoSrc, visible, playing, onTog
 
   function startDrag(clientX: number, clientY: number) {
     dragging.current = true;
+    moved.current = false;
+    dragStart.current = { x: clientX, y: clientY };
     dragOffset.current = { x: clientX - (pos?.x ?? 0), y: clientY - (pos?.y ?? 0) };
     document.body.style.userSelect = "none";
   }
 
   function onMouseDown(e: React.MouseEvent) {
-    if ((e.target as HTMLElement).closest("button")) return;
     startDrag(e.clientX, e.clientY);
     e.preventDefault();
   }
 
   function onTouchStart(e: React.TouchEvent) {
-    if ((e.target as HTMLElement).closest("button")) return;
     startDrag(e.touches[0].clientX, e.touches[0].clientY);
   }
 
@@ -141,7 +153,10 @@ export default function MiniPlayer({ videoRef, videoSrc, visible, playing, onTog
       <video ref={miniRef} src={videoSrc} muted playsInline className="mini-player-video" />
       <button
         className="mini-player-overlay"
-        onClick={onTogglePlay}
+        onClick={() => {
+          if (moved.current) return;
+          onTogglePlay();
+        }}
         aria-label={playing ? "Pause" : "Play"}
       >
         <span className="mini-player-icon">{playing ? "⏸" : "▶"}</span>

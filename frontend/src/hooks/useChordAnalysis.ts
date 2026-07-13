@@ -3,6 +3,8 @@ import { api, APIError, type AnalysisDemoResponse } from "../services/api";
 
 export function useChordAnalysis(onComplete?: () => void) {
   const [analysisData, setAnalysisData] = useState<AnalysisDemoResponse | null>(null);
+  // URL whose analysis is currently loaded (as opposed to whatever is typed in the input)
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +37,7 @@ export function useChordAnalysis(onComplete?: () => void) {
           const result = await api.analysis.analyze(youtubeUrl);
           if (activeJobIdRef.current !== job_id) return; // superseded during fetch
           setAnalysisData(result);
+          setLoadedUrl(youtubeUrl);
         } catch (err) {
           if (activeJobIdRef.current !== job_id) return;
           setError(err instanceof APIError ? err.message : "Failed");
@@ -90,6 +93,7 @@ export function useChordAnalysis(onComplete?: () => void) {
     try {
       const result = await api.analysis.analyze(url);
       setAnalysisData(result);
+      setLoadedUrl(url);
     } catch (err) {
       setError(err instanceof APIError ? err.message : "Failed");
     } finally {
@@ -106,5 +110,5 @@ export function useChordAnalysis(onComplete?: () => void) {
     _trackJob(job_id, youtubeUrl, afterComplete);
   }
 
-  return { analysisData, loading, error, analyze, loadCached, analyzeWithJobId, key };
+  return { analysisData, loadedUrl, loading, error, analyze, loadCached, analyzeWithJobId, key };
 }
