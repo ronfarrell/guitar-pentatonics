@@ -4,7 +4,14 @@ from fastapi import HTTPException
 from pathlib import Path
 from app.models.analysis import AnalysisRequest, AnalysisResult, Chord
 from app.services.analysis import process_youtube_video
-from app.services.progress import get_progress, cleanup_progress
+from app.services.progress import get_progress, cleanup_progress, ProgressTracker
+from app.services.separation import (
+    separate_instrumental,
+    existing_instrumental,
+    separate_stems,
+    existing_stems,
+)
+from app.services.storage import get_cached_analysis, set_instrumental_path
 import logging
 import uuid
 import asyncio
@@ -150,6 +157,105 @@ async def analyze_youtube(request: AnalysisRequest) -> AnalysisResult:
         )
         logger.info(f"Returning fallback data")
         return dummy_result
+
+
+@router.post("/instrumental/start")
+async def start_instrumental(request: AnalysisRequest) -> dict:
+    """
+    Start vocal separation for an already-analyzed song.
+
+    Returns {"status": "completed", "instrumental_path": ...} if a backing
+    track already exists, otherwise {"job_id": ..., "status": "processing"}
+    for tracking via the existing /progress and /stream endpoints.
+    """
+    cached = get_cached_analysis(request.youtube_url)
+    if not cached or not cached.audio_path:
+        raise HTTPException(status_code=404, detail="Song has not been analyzed yet")
+
+    # Already separated (DB record, or file left over from a reanalyze)
+    instrumental = cached.instrumental_path or existing_instrumental(cached.audio_path)
+    if instrumental and Path(instrumental).exists():
+        if instrumental != cached.instrumental_path:
+            set_instrumental_path(request.youtube_url, instrumental)
+        return {"status": "completed", "instrumental_path": instrumental}
+
+    job_id = str(uuid.uuid4())
+    logger.info(f"Started separation job {job_id} for: {request.youtube_url}")
+
+    async def run_separation():
+        progress = ProgressTracker(job_id)
+        try:
+            path = await separate_instrumental(cached.audio_path, progress)
+            set_instrumental_path(request.youtube_url, path)
+        except Exception as e:
+            logger.error(f"Separation job {job_id} failed: {e}", exc_info=True)
+
+    asyncio.create_task(run_separation())
+    return {"job_id": job_id, "status": "processing"}
+
+
+@router.post("/stems/start")
+async def start_stems(request: AnalysisRequest) -> dict:
+    """
+    Start a full 6-stem split (vocals/drums/bass/guitar/piano/other) for an
+    already-analyzed song.
+
+    Returns {"status": "completed", "stems": {...}} if stems already exist,
+    otherwise {"job_id": ..., "status": "processing"} for tracking via the
+    existing /progress and /stream endpoints.
+    """
+    cached = get_cached_analysis(request.youtube_url)
+    if not cached or not cached.audio_path:
+        raise HTTPException(status_code=404, detail="Song has not been analyzed yet")
+
+    stems = existing_stems(cached.audio_path)
+    if stems:
+        return {"status": "completed", "stems": stems}
+
+    job_id = str(uuid.uuid4())
+    logger.info(f"Started stem split job {job_id} for: {request.youtube_url}")
+
+    async def run_split():
+        progress = ProgressTracker(job_id)
+        try:
+            await separate_stems(cached.audio_path, progress)
+        except Exception as e:
+            logger.error(f"Stem split job {job_id} failed: {e}", exc_info=True)
+
+    asyncio.create_task(run_split())
+    return {"job_id": job_id, "status": "processing"}
+
+
+@router.get("/audio/{file_path:path}")
+async def serve_audio(file_path: str):
+    """
+    Serve audio files (e.g. generated instrumentals) from local cache
+
+    Usage: GET /analysis/audio/backend/data/audio/{hash}/instrumental.mp3
+    """
+    try:
+        full_path = Path(file_path)
+
+        # Security check: ensure path is within data directory
+        data_dir = Path(__file__).parent.parent.parent / "data"
+        if not full_path.resolve().is_relative_to(data_dir.resolve()):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        if not full_path.exists():
+            raise HTTPException(status_code=404, detail="Audio not found")
+
+        logger.info(f"Serving audio: {full_path}")
+
+        return FileResponse(
+            full_path,
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": "inline"}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving audio: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error serving audio")
 
 
 @router.get("/video/{file_path:path}")

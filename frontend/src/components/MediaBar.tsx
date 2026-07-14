@@ -1,12 +1,15 @@
 import { useRef, useEffect, useState } from "react";
 import type { RefObject } from "react";
 import type { MediaControls } from "../hooks/useMediaControls";
+import type { StemPlayer } from "../hooks/useStemPlayer";
+import { STEM_NAMES } from "../hooks/useStemPlayer";
 
 type Props = MediaControls & {
   videoRef: RefObject<HTMLVideoElement | null>;
   videoSrc: string | null;
   title?: string | null;
   videoKey?: string | null;
+  stemPlayer: StemPlayer;
 };
 
 export default function MediaBar({
@@ -24,10 +27,14 @@ export default function MediaBar({
   formatTime,
   title,
   videoKey,
+  stemPlayer,
 }: Props) {
   const titleWrapRef = useRef<HTMLDivElement>(null);
   const titleInnerRef = useRef<HTMLSpanElement>(null);
   const [titleOverflow, setTitleOverflow] = useState(0);
+
+  const [mixerOpen, setMixerOpen] = useState(false);
+  const mixerWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const outer = titleWrapRef.current;
@@ -35,6 +42,16 @@ export default function MediaBar({
     if (!outer || !inner) { setTitleOverflow(0); return; }
     setTitleOverflow(Math.max(0, inner.scrollWidth - outer.clientWidth));
   }, [title]);
+
+  // Close the mixer popover on outside click
+  useEffect(() => {
+    if (!mixerOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!mixerWrapRef.current?.contains(e.target as Node)) setMixerOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [mixerOpen]);
 
   if (!videoSrc) return null;
 
@@ -59,6 +76,106 @@ export default function MediaBar({
           <path d="M21 13v2a4 4 0 0 1-4 4H3" />
         </svg>
       </button>
+
+      <button
+        className={`media-icon-btn${stemPlayer.vocalsOff ? " media-icon-btn--active" : ""}`}
+        onClick={stemPlayer.toggleVocals}
+        disabled={stemPlayer.vocalsBusy}
+        aria-label={stemPlayer.vocalsOff ? "Vocals off" : "Vocals on"}
+        title={
+          stemPlayer.error
+            ? `Backing track failed: ${stemPlayer.error}`
+            : stemPlayer.vocalsBusy
+              ? `Removing vocals... ${stemPlayer.vocalsProgress}%`
+              : stemPlayer.vocalsOff
+                ? "Vocals: Off — click to bring them back"
+                : "Vocals: On — click to remove vocals"
+        }
+      >
+        {stemPlayer.vocalsBusy ? (
+          <span className="media-bt-progress">{stemPlayer.vocalsProgress}%</span>
+        ) : (
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="1" y1="1" x2="23" y2="23" />
+            <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+            <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
+            <line x1="12" y1="19" x2="12" y2="23" />
+            <line x1="8" y1="23" x2="16" y2="23" />
+          </svg>
+        )}
+      </button>
+
+      <div className="media-mixer-wrap" ref={mixerWrapRef}>
+        <button
+          className={`media-icon-btn${stemPlayer.mixActive ? " media-icon-btn--active" : ""}`}
+          onClick={() => setMixerOpen((v) => !v)}
+          aria-label="Stem mixer"
+          aria-expanded={mixerOpen}
+          title="Stem mixer — choose which instruments play"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="4" y1="21" x2="4" y2="14" />
+            <line x1="4" y1="10" x2="4" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12" y2="3" />
+            <line x1="20" y1="21" x2="20" y2="16" />
+            <line x1="20" y1="12" x2="20" y2="3" />
+            <line x1="1" y1="14" x2="7" y2="14" />
+            <line x1="9" y1="8" x2="15" y2="8" />
+            <line x1="17" y1="16" x2="23" y2="16" />
+          </svg>
+        </button>
+
+        {mixerOpen && (
+          <div className="stem-panel">
+            <div className="stem-panel-header">
+              <span>Stem mixer</span>
+              {stemPlayer.stemsAvailable && (
+                <button
+                  className={`toggle-btn${stemPlayer.mixActive ? " toggle-btn--on" : ""}`}
+                  onClick={() => stemPlayer.setMixActive(!stemPlayer.mixActive)}
+                >
+                  {stemPlayer.mixActive ? "On" : "Off"}
+                </button>
+              )}
+            </div>
+
+            {!stemPlayer.stemsAvailable ? (
+              <div className="stem-panel-body">
+                <p className="stem-panel-hint">
+                  Split the song into six instrument stems, then choose exactly
+                  what plays while you practice.
+                </p>
+                <button
+                  className="stem-generate-btn"
+                  onClick={stemPlayer.generateStems}
+                  disabled={stemPlayer.stemsBusy}
+                >
+                  {stemPlayer.stemsBusy
+                    ? `Splitting stems... ${stemPlayer.stemsProgress}%`
+                    : "Split stems"}
+                </button>
+                {stemPlayer.error && <p className="stem-panel-error">{stemPlayer.error}</p>}
+              </div>
+            ) : (
+              <div className="stem-panel-body">
+                {STEM_NAMES.map((name) => (
+                  <label key={name} className={`stem-row${stemPlayer.mixActive ? "" : " stem-row--inactive"}`}>
+                    <span className="stem-row-name">{name}</span>
+                    <input
+                      type="checkbox"
+                      checked={stemPlayer.mix[name]}
+                      disabled={!stemPlayer.mixActive}
+                      onChange={(e) => stemPlayer.setStemAudible(name, e.target.checked)}
+                    />
+                  </label>
+                ))}
+                {stemPlayer.error && <p className="stem-panel-error">{stemPlayer.error}</p>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <button className="media-play-btn" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
         {playing ? "⏸" : "▶"}

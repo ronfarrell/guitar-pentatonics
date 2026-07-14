@@ -17,3 +17,4 @@ pytest
 
 torch
 torchaudio
+demucs

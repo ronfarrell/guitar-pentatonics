@@ -10,6 +10,8 @@ export type ScaleType =
   | "Major + Minor Pentatonic"
   | "Dorian"
   | "Mixolydian"
+  | "Lydian"
+  | "Phrygian"
   | "Major Triad"
   | "Minor Triad"
   | "Diminished Triad"
@@ -25,6 +27,8 @@ export const SCALE_TYPES: ScaleType[] = [
   "Major + Minor Pentatonic",
   "Dorian",
   "Mixolydian",
+  "Lydian",
+  "Phrygian",
 ];
 
 export const TRIAD_TYPES: ScaleType[] = [
@@ -42,6 +46,7 @@ const MAJOR_TO_MINOR: Partial<Record<ScaleType, ScaleType>> = {
   "Major Pentatonic": "Minor Pentatonic",
   "Major Triad": "Minor Triad",
   Mixolydian: "Dorian",
+  Lydian: "Dorian",
 };
 
 const MINOR_TO_MAJOR: Partial<Record<ScaleType, ScaleType>> = {
@@ -50,6 +55,7 @@ const MINOR_TO_MAJOR: Partial<Record<ScaleType, ScaleType>> = {
   "Minor Pentatonic": "Major Pentatonic",
   "Minor Triad": "Major Triad",
   Dorian: "Mixolydian",
+  Phrygian: "Mixolydian",
 };
 
 /**
@@ -108,6 +114,12 @@ const SCALE_FORMULAS: Record<ScaleType, number[]> = {
   // 1 2 3 4 5 6 b7
   Mixolydian: [0, 2, 4, 5, 7, 9, 10],
 
+  // 1 2 3 #4 5 6 7
+  Lydian: [0, 2, 4, 6, 7, 9, 11],
+
+  // 1 b2 b3 4 5 b6 b7
+  Phrygian: [0, 1, 3, 5, 7, 8, 10],
+
   // Triads: root, third, fifth
   "Major Triad": [0, 4, 7],
   "Minor Triad": [0, 3, 7],
@@ -129,9 +141,11 @@ export const getScaleNotes = (root: string, scaleType: ScaleType): string[] => {
 const PENTATONIC_BASE: Partial<Record<ScaleType, ScaleType>> = {
   Major: "Major Pentatonic",
   Mixolydian: "Major Pentatonic",
+  Lydian: "Major Pentatonic",
   "Natural Minor": "Minor Pentatonic",
   "Harmonic Minor": "Minor Pentatonic",
   Dorian: "Minor Pentatonic",
+  Phrygian: "Minor Pentatonic",
   Blues: "Minor Pentatonic",
 };
 

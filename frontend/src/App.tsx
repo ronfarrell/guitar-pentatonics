@@ -20,6 +20,7 @@ import { useChordAnalysis } from "./hooks/useChordAnalysis";
 import { useChordTracker } from "./hooks/useChordTracker";
 import { useSavedSongs } from "./hooks/useSavedSongs";
 import { useMediaControls } from "./hooks/useMediaControls";
+import { useStemPlayer } from "./hooks/useStemPlayer";
 import { isTriadType, matchScaleToKeyQuality } from "./theory/scales";
 import { suggestScales, detectProgression } from "./theory/analysis";
 import { PROGRESSIONS, CUSTOM_PROGRESSION_ID, getChordRoot, type ProgressionChord } from "./theory/progressions";
@@ -28,6 +29,9 @@ import { loadFretboardColors } from "./components/FretboardColorSettings";
 import type { FretboardColors } from "./components/FretboardColorSettings";
 import { loadPlaybackSession, savePlaybackSession } from "./services/sessionStore";
 import type { PlaybackSession } from "./services/sessionStore";
+import SettingsPage from "./components/SettingsPage";
+import { loadThemeSettings, saveThemeSettings, applyThemeSettings } from "./theme/themeSettings";
+import type { ThemeSettings } from "./theme/themeSettings";
 
 function extractRoot(chord: string | null): NoteName | null {
   return chord?.match(/^[A-G](#|b)?/)?.[0] as NoteName | null;
@@ -39,9 +43,8 @@ function App() {
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [fretMode, setFretMode] = useState<FretMode>("manual");
 
-  const [theme, setTheme] = useState<"dark" | "light">(() =>
-    localStorage.getItem("theme") === "light" ? "light" : "dark",
-  );
+  const [themeSettings, setThemeSettings] = useState<ThemeSettings>(loadThemeSettings);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [chordOpen, setChordOpen] = useState(false);
 
@@ -63,6 +66,13 @@ function App() {
     : null;
 
   const mediaControls = useMediaControls(videoRef, videoSrc);
+
+  const stemPlayer = useStemPlayer(
+    videoRef,
+    loadedUrl,
+    analysisData?.instrumental_path ?? null,
+    analysisData?.stems ?? null,
+  );
 
   // Restore the last session (song + position) once on mount
   const resumeRef = useRef<PlaybackSession | null>(null);
@@ -191,9 +201,8 @@ function App() {
   }, [showTriads, fretRoot, fretScaleType]);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem("theme", theme);
-  }, [theme]);
+    applyThemeSettings(themeSettings);
+  }, [themeSettings]);
 
   const progressionLen =
     progressionId === null
@@ -449,27 +458,32 @@ function App() {
         videoSrc={videoSrc}
         title={analysisData?.video_title}
         videoKey={analysisData?.key}
+        stemPlayer={stemPlayer}
         {...mediaControls}
       />
 
       <button
-        className="theme-fab"
-        onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-        aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
-        title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+        className="settings-fab"
+        onClick={() => setSettingsOpen(true)}
+        aria-label="Open settings"
+        title="Settings"
       >
-        {theme === "light" ? (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-            <line x1="1" y1="1" x2="23" y2="23"/>
-          </svg>
-        )}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
       </button>
+
+      {settingsOpen && (
+        <SettingsPage
+          saved={themeSettings}
+          onSave={(s) => {
+            saveThemeSettings(s);
+            setThemeSettings(s);
+          }}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </>
   );
 }

@@ -950,7 +950,7 @@ select:disabled {
   z-index: 900;
 
   width: max-content;
-  max-width: min(520px, calc(100vw - 32px));
+  max-width: min(565px, calc(100vw - 32px));
   min-width: 280px;
   padding: 9px 16px;
 
@@ -1008,6 +1008,106 @@ select:disabled {
 
 .media-icon-btn--active {
   color: var(--accent);
+}
+
+.media-icon-btn:disabled {
+  cursor: default;
+}
+
+.media-bt-progress {
+  font-size: 9px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Stem mixer popover ---- */
+
+.media-mixer-wrap {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+}
+
+.stem-panel {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 210px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 12px;
+  z-index: 60;
+}
+
+.stem-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.stem-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stem-panel-hint {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin: 0 0 8px;
+}
+
+.stem-generate-btn {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.stem-generate-btn:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.stem-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text);
+  text-transform: capitalize;
+  padding: 3px 2px;
+  cursor: pointer;
+}
+
+.stem-row input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.stem-row--inactive {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.stem-panel-error {
+  font-size: 11px;
+  color: #e5484d;
+  margin: 6px 0 0;
 }
 
 .media-time {
@@ -1081,6 +1181,7 @@ select:disabled {
   min-width: 0;
   max-width: 140px;
   flex-shrink: 1;
+  overflow: hidden;
 }
 
 .media-title-wrap {
@@ -1110,6 +1211,8 @@ select:disabled {
   font-size: 10px;
   color: var(--muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* =========================
@@ -1185,10 +1288,11 @@ select:disabled {
    THEME FAB
 ========================= */
 
-.theme-fab {
+.settings-fab {
   position: fixed;
   bottom: 22px;
-  left: calc(50% - min(260px, 50vw - 16px) - 50px);
+  /* sits just left of the media bar: 283px ≈ half its 565px max-width */
+  left: calc(50% - min(283px, 50vw - 16px) - 50px);
   z-index: 902;
 
   width: 42px;
@@ -1207,15 +1311,221 @@ select:disabled {
   transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
-.theme-fab svg {
+.settings-fab svg {
   width: 18px;
   height: 18px;
 }
 
-.theme-fab:hover {
+.settings-fab:hover {
   color: var(--accent);
   border-color: var(--accent);
-  transform: scale(1.08);
+  transform: scale(1.08) rotate(20deg);
+}
+
+/* =========================
+   SETTINGS PAGE
+========================= */
+
+.settings-page {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--page-bg);
+  overflow-y: auto;
+}
+
+.settings-container {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.settings-header h2 {
+  font-size: 20px;
+  color: var(--text);
+  margin: 0;
+}
+
+.settings-back {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-back:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.settings-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+
+.settings-section h3 {
+  font-size: 14px;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.settings-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+
+.mode-cards {
+  display: flex;
+  gap: 12px;
+}
+
+.mode-card {
+  flex: 1;
+  max-width: 180px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.15s ease;
+}
+
+.mode-card--selected {
+  border-color: var(--accent);
+}
+
+.mode-card-preview {
+  display: block;
+  border-radius: 8px;
+  padding: 10px;
+  height: 64px;
+}
+
+.mode-card-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-radius: 6px;
+  padding: 8px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.mode-card-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.mode-card-line {
+  height: 4px;
+  border-radius: 2px;
+  width: 80%;
+}
+
+.mode-card-line--short {
+  width: 55%;
+}
+
+.mode-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+}
+
+.accent-swatches {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.accent-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.accent-swatch--selected {
+  border-color: var(--accent);
+}
+
+.accent-swatch-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+
+.accent-swatch-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.settings-cancel-btn {
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-cancel-btn:hover {
+  color: var(--text);
+}
+
+.settings-save-btn {
+  padding: 8px 22px;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-save-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* =========================

@@ -36,6 +36,7 @@ def init_db():
             chords TEXT NOT NULL,  -- JSON array
             audio_path TEXT,
             video_path TEXT,
+            instrumental_path TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -46,6 +47,9 @@ def init_db():
     if "video_path" not in columns:
         logger.info("[DB] Adding video_path column to existing table...")
         cursor.execute("ALTER TABLE analyses ADD COLUMN video_path TEXT")
+    if "instrumental_path" not in columns:
+        logger.info("[DB] Adding instrumental_path column to existing table...")
+        cursor.execute("ALTER TABLE analyses ADD COLUMN instrumental_path TEXT")
     
     conn.close()
     logger.info("[DB] Database ready")
@@ -70,7 +74,7 @@ def get_cached_analysis(youtube_url: str) -> AnalysisResult | None:
 
     cursor.execute(
         """
-        SELECT key, video_title, chords, audio_path, video_path
+        SELECT key, video_title, chords, audio_path, video_path, instrumental_path
         FROM analyses
         WHERE url_hash = ?
         """,
@@ -86,7 +90,7 @@ def get_cached_analysis(youtube_url: str) -> AnalysisResult | None:
 
     logger.info("[DB] Cache hit!")
 
-    key, video_title, chords_json, audio_path, video_path = row
+    key, video_title, chords_json, audio_path, video_path, instrumental_path = row
 
     logger.warning(f"[DB] Cached video title: {video_title}")
     logger.warning(f"[DB] Cached audio path: {audio_path}")
@@ -95,11 +99,15 @@ def get_cached_analysis(youtube_url: str) -> AnalysisResult | None:
     from app.models.analysis import Chord
     chords = [Chord(**chord) for chord in json.loads(chords_json)]
 
+    from app.services.separation import existing_stems
+
     result = AnalysisResult(
         key=key,
         chords=chords,
         audio_path=audio_path,
         video_path=video_path,
+        instrumental_path=instrumental_path,
+        stems=existing_stems(audio_path),
     )
 
     # attach title if your model supports it
@@ -143,9 +151,9 @@ def save_analysis(youtube_url: str, result: AnalysisResult) -> int:
 
         logger.info(f"[DB] Inserting analysis record...")
         cursor.execute("""
-            INSERT INTO analyses (youtube_url, url_hash, key, chords, audio_path, video_path, video_title)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (youtube_url, url_hash, result.key, chords_json, result.audio_path, result.video_path, result.video_title  ))
+            INSERT INTO analyses (youtube_url, url_hash, key, chords, audio_path, video_path, instrumental_path, video_title)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (youtube_url, url_hash, result.key, chords_json, result.audio_path, result.video_path, result.instrumental_path, result.video_title  ))
         
         logger.info(f"[DB] Insert successful")
         record_id = cursor.lastrowid
@@ -153,9 +161,9 @@ def save_analysis(youtube_url: str, result: AnalysisResult) -> int:
         # URL already exists, update it
         logger.info(f"[DB] URL exists, updating...")
         cursor.execute("""
-            UPDATE analyses SET key = ?, chords = ?, audio_path = ?, video_path = ?
+            UPDATE analyses SET key = ?, chords = ?, audio_path = ?, video_path = ?, instrumental_path = ?
             WHERE url_hash = ?
-        """, (result.key, chords_json, result.audio_path, result.video_path, url_hash))
+        """, (result.key, chords_json, result.audio_path, result.video_path, result.instrumental_path, url_hash))
         
         logger.info(f"[DB] Update successful")
         record_id = cursor.lastrowid
@@ -164,6 +172,19 @@ def save_analysis(youtube_url: str, result: AnalysisResult) -> int:
         logger.info(f"[DB] Database connection closed")
     
     return record_id
+
+
+def set_instrumental_path(youtube_url: str, instrumental_path: str) -> None:
+    """Record the generated instrumental file for an already-analyzed song"""
+    init_db()
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE analyses SET instrumental_path = ? WHERE url_hash = ?",
+        (instrumental_path, get_url_hash(youtube_url)),
+    )
+    conn.close()
+    logger.info(f"[DB] Instrumental path saved for: {youtube_url}")
 
 
 def get_analysis(record_id: int) -> AnalysisResult | None:

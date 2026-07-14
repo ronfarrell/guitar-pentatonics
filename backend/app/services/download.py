@@ -153,6 +153,19 @@ async def download_youtube_audio(
             progress_tracker.error(f"Download error: {e}")
         raise
 
+def _video_height(path: Path) -> int | None:
+    """Height in pixels of the first video stream, or None if probing fails."""
+    try:
+        proc = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-select_streams", "v:0",
+             "-show_entries", "stream=height", "-of", "csv=p=0", str(path)],
+            capture_output=True, text=True, timeout=30,
+        )
+        return int(proc.stdout.strip().splitlines()[0])
+    except Exception:
+        return None
+
+
 async def download_youtube_video(youtube_url: str, progress_tracker: ProgressTracker | None = None) -> str:
     """
     Download YouTube video with caching and progress tracking.
@@ -175,14 +188,21 @@ async def download_youtube_video(youtube_url: str, progress_tracker: ProgressTra
         cache_dir = VIDEO_DIR / video_id
         cache_dir.mkdir(parents=True, exist_ok=True)
         
-        # Check if already cached
+        # Check if already cached. Files from before the 1080p format fix are
+        # only 360p — treat those as stale so they get upgraded on the next
+        # download pass (e.g. a reanalyze) instead of being served forever.
         logger.info(f"[VIDEO] Checking cache: {cache_dir}")
         cached_files = list(cache_dir.glob("video.*"))
         if cached_files:
-            logger.info(f"[VIDEO] Found cached file: {cached_files[0]}")
-            if progress_tracker:
-                progress_tracker.update("downloading", 50, "Using cached video")
-            return str(cached_files[0])
+            height = _video_height(cached_files[0])
+            if height is None or height >= 720:
+                logger.info(f"[VIDEO] Found cached file: {cached_files[0]} ({height}p)")
+                if progress_tracker:
+                    progress_tracker.update("downloading", 50, "Using cached video")
+                return str(cached_files[0])
+            logger.info(f"[VIDEO] Cached file is only {height}p — re-downloading at higher quality")
+            for f in cached_files:
+                f.unlink(missing_ok=True)
         
         if progress_tracker:
             progress_tracker.update("downloading", 20, "Downloading video from YouTube...")

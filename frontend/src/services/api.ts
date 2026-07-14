@@ -13,7 +13,21 @@ export type AnalysisDemoResponse = {
   chords: Array<{ start: number; end: number; chord: string }>;
   audio_path?: string;
   video_path?: string;
+  instrumental_path?: string;
+  stems?: Record<string, string>;
   video_title?: string;
+};
+
+export type InstrumentalStartResponse = {
+  status: 'completed' | 'processing';
+  job_id?: string;
+  instrumental_path?: string;
+};
+
+export type StemsStartResponse = {
+  status: 'completed' | 'processing';
+  job_id?: string;
+  stems?: Record<string, string>;
 };
 
 // API error handling
@@ -84,5 +98,15 @@ export const api = {
       const baseUrl = API_BASE_URL.replace(/\/$/, '');
       return new EventSource(`${baseUrl}/analysis/stream/${jobId}`);
     },
+    startInstrumental: (youtubeUrl: string) =>
+      fetchAPI<InstrumentalStartResponse>('/analysis/instrumental/start', {
+        method: 'POST',
+        body: JSON.stringify({ youtube_url: youtubeUrl }),
+      }),
+    startStems: (youtubeUrl: string) =>
+      fetchAPI<StemsStartResponse>('/analysis/stems/start', {
+        method: 'POST',
+        body: JSON.stringify({ youtube_url: youtubeUrl }),
+      }),
   },
 };

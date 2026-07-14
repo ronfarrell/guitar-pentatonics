@@ -6,6 +6,7 @@ Paste a YouTube link, get a live fretboard. The app downloads the audio, detects
 - Detected key and scale displayed on a full fretboard
 - Chord-by-chord playback tracker (previous / now / next)
 - Toggle triads on the fretboard to see chord tones highlighted
+- Backing-track mode — strip the vocals (Demucs) and play along with the instrumental
 - Customizable fretboard colors (root, triads, scale notes)
 - Previously analyzed songs saved and replayable without re-downloading
 

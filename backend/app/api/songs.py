@@ -4,7 +4,6 @@ import shutil
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from app.services.storage import list_all_analyses, delete_analysis_by_id, clear_cache_for_reanalyze
-from app.services.download import VIDEO_DIR, get_video_id_from_url
 from app.services.analysis import process_youtube_video
 from app.models.analysis import AnalysisRequest
 
@@ -64,25 +63,28 @@ def delete_song(song_id: int):
 
 @router.post("/{song_id}/reanalyze")
 async def reanalyze_song(song_id: int):
-    """Clear the cached analysis for a song and kick off a fresh analysis job."""
+    """
+    Re-run chord/key detection for a song.
+
+    Chords-only: audio and video caches are kept. Detection runs on the
+    vocals-stripped instrumental (separated first if needed) since vocal
+    melody interferes with chord recognition — this is the accuracy pass.
+    """
     youtube_url, video_title = clear_cache_for_reanalyze(song_id)
 
     if not youtube_url:
         raise HTTPException(status_code=404, detail="Song not found")
 
-    # Drop the cached video so reanalysis re-downloads it (e.g. at a higher
-    # quality than the originally cached file). Audio cache is kept — it
-    # doesn't affect playback quality and skipping it speeds up reanalysis.
-    video_cache_dir = VIDEO_DIR / get_video_id_from_url(youtube_url)
-    if video_cache_dir.exists():
-        shutil.rmtree(video_cache_dir, ignore_errors=True)
-        logger.info(f"[REANALYZE] Cleared cached video: {video_cache_dir}")
-
     job_id = str(uuid.uuid4())
     logger.info(f"[REANALYZE] Starting job {job_id} for song {song_id}: {youtube_url}")
 
     asyncio.create_task(
-        process_youtube_video(AnalysisRequest(youtube_url=youtube_url), job_id, preserved_title=video_title)
+        process_youtube_video(
+            AnalysisRequest(youtube_url=youtube_url),
+            job_id,
+            preserved_title=video_title,
+            use_instrumental=True,
+        )
     )
 
     return {"job_id": job_id, "youtube_url": youtube_url}

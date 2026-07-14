@@ -66,9 +66,19 @@ export function suggestScales(
   const { weights, total } = degreeWeights(chords, noteIndex(root));
   if (total <= 0) return [];
 
+  // fraction of the song spent on a given degree/quality
+  const frac = (degree: number, minor: boolean) =>
+    (weights.get(`${degree}|${minor}`) ?? 0) / total;
   // a degree "appears" if it covers at least ~3% of the song
-  const has = (degree: number, minor: boolean) =>
-    (weights.get(`${degree}|${minor}`) ?? 0) / total >= 0.03;
+  const has = (degree: number, minor: boolean) => frac(degree, minor) >= 0.03;
+  // combined time on a set of degrees, either quality
+  const fracOn = (degrees: number[]) =>
+    degrees.reduce((sum, d) => sum + frac(d, false) + frac(d, true), 0);
+
+  const minorChordTime = [...weights.entries()].reduce(
+    (sum, [k, w]) => (k.endsWith("true") ? sum + w / total : sum),
+    0,
+  );
 
   const suggestions: ScaleSuggestion[] = [];
 
@@ -78,6 +88,22 @@ export function suggestScales(
       scale: "Natural Minor",
       reason: "The full minor scale — safe over the whole song",
     });
+
+    // minor blues: the song lives on i, iv and v, with the iv actually minor
+    // (a major IV points to Dorian instead)
+    if (fracOn([0, 5, 7]) >= 0.75 && frac(0, true) >= 0.2 && frac(5, true) >= 0.05 && fracOn([7]) >= 0.05)
+      suggestions.push({
+        root,
+        scale: "Blues",
+        reason: "i–iv–v workout — a minor blues; the ♭5 blue note fits everywhere",
+      });
+    else if (has(0, false))
+      suggestions.push({
+        root,
+        scale: "Blues",
+        reason: "Tonic appears as both major and minor — bluesy tonality",
+      });
+
     if (has(5, false))
       suggestions.push({
         root,
@@ -90,11 +116,11 @@ export function suggestScales(
         scale: "Harmonic Minor",
         reason: "Major V chord — harmonic minor fits over the dominant",
       });
-    if (has(0, false))
+    if (has(1, false))
       suggestions.push({
         root,
-        scale: "Blues",
-        reason: "Tonic appears as both major and minor — bluesy tonality",
+        scale: "Phrygian",
+        reason: "♭II major chord — Phrygian's flat 2nd matches it",
       });
   } else {
     suggestions.push({
@@ -102,13 +128,48 @@ export function suggestScales(
       scale: "Major",
       reason: "The full major scale — safe over the whole song",
     });
+
+    // blues: I, IV and V carry the song and minor chords barely appear
+    const bluesy =
+      fracOn([0, 5, 7]) >= 0.75 &&
+      frac(0, false) >= 0.2 &&
+      frac(5, false) >= 0.05 &&
+      frac(7, false) >= 0.05 &&
+      minorChordTime <= 0.1;
+    if (bluesy) {
+      suggestions.push({
+        root,
+        scale: "Blues",
+        reason: "I–IV–V with barely any minor chords — a blues; the minor-blues scale works over all three",
+      });
+      suggestions.push({
+        root,
+        scale: "Major + Minor Pentatonic",
+        reason: "Blues move: mix the sweet major pentatonic with gritty minor pentatonic licks",
+      });
+    }
+
     if (has(10, false))
       suggestions.push({
         root,
         scale: "Mixolydian",
         reason: "♭VII major chord points to Mixolydian",
       });
-    if (has(0, true))
+    else if (fracOn([0]) + fracOn([5]) >= 0.75 && frac(7, false) < 0.03)
+      suggestions.push({
+        root,
+        scale: "Mixolydian",
+        reason: "I–IV vamp with no V — Mixolydian's ♭7 adds a dominant, jammy flavor",
+      });
+
+    if (has(2, false) && !has(5, false) && !has(5, true))
+      suggestions.push({
+        root,
+        scale: "Lydian",
+        reason: "Major II chord and no IV — Lydian's #4 captures that floating sound",
+      });
+
+    if (!bluesy && has(0, true))
       suggestions.push({
         root,
         scale: "Major + Minor Pentatonic",
