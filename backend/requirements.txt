@@ -8,6 +8,7 @@ pandas
 
 librosa
 soundfile
+essentia==2.1b6.dev1389
 
 yt-dlp
 

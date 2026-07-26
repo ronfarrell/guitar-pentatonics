@@ -1,6 +1,8 @@
 import os
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api import health, analysis, songs
 
@@ -37,11 +39,20 @@ app.include_router(songs.router, prefix="/songs", tags=["Songs"])
 
 
 # -----------------------
-# Root endpoint
+# Frontend (optional)
 # -----------------------
-@app.get("/")
-def root():
-    return {
-        "service": "guitar-pentatonics-backend",
-        "status": "running"
-    }
+# When a production build is present (frontend/dist), serve it directly from
+# this process — used by the Windows launcher, which runs the backend
+# standalone instead of through Docker/nginx. Local `npm run dev` (port 5173)
+# is unaffected since this only activates when the built dist/ exists.
+FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
+
+if FRONTEND_DIST.is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
+else:
+    @app.get("/")
+    def root():
+        return {
+            "service": "guitar-pentatonics-backend",
+            "status": "running"
+        }

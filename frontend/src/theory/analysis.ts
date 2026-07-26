@@ -4,7 +4,7 @@
 import { NOTE_NAMES, noteIndex } from "./notes";
 import type { NoteName } from "./notes";
 import type { ScaleType } from "./scales";
-import { PROGRESSIONS } from "./progressions";
+import { PROGRESSIONS, isMinorQuality } from "./progressions";
 import type { ProgressionChord } from "./progressions";
 
 export type TimelineChord = { start: number; end: number; chord: string };
@@ -281,7 +281,7 @@ export function detectProgression(
   for (const p of exactFirst) {
     const pattern: Degree[] = p.chords.map((c) => ({
       degree: c.semitones,
-      minor: c.quality === "minor",
+      minor: isMinorQuality(c.quality),
     }));
     if (cyclicMatch(pattern, best) || (collapsed && cyclicMatch(pattern, collapsed))) {
       matchId = p.id;

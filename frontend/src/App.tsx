@@ -23,7 +23,7 @@ import { useMediaControls } from "./hooks/useMediaControls";
 import { useStemPlayer } from "./hooks/useStemPlayer";
 import { isTriadType, matchScaleToKeyQuality } from "./theory/scales";
 import { suggestScales, detectProgression } from "./theory/analysis";
-import { PROGRESSIONS, CUSTOM_PROGRESSION_ID, getChordRoot, type ProgressionChord } from "./theory/progressions";
+import { PROGRESSIONS, CUSTOM_PROGRESSION_ID, getChordRoot, isMinorQuality, type ProgressionChord } from "./theory/progressions";
 import ProgressionPanel from "./components/ProgressionPanel";
 import { loadFretboardColors } from "./components/FretboardColorSettings";
 import type { FretboardColors } from "./components/FretboardColorSettings";
@@ -184,7 +184,7 @@ function App() {
         : scaleType;
     }
     if (selectedProgressionChord)
-      return selectedProgressionChord.quality === "minor"
+      return isMinorQuality(selectedProgressionChord.quality)
         ? "Minor Pentatonic"
         : "Major Pentatonic";
     if (fretMode === "song" && songRoot)

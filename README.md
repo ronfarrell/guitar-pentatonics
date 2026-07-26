@@ -27,6 +27,26 @@ Open [http://localhost](http://localhost) in your browser.
 > The first build takes several minutes — PyTorch is large. Subsequent starts are fast.
 > Analyzed audio and video files persist in a Docker volume across restarts.
 
+### Windows: launch as a standalone app
+
+If this repo lives inside WSL (as it does here), you can launch the app straight from the Windows Desktop — no VS Code, no terminal, no browser tab.
+
+This path skips Docker: it runs the backend directly against the project's own `.venv` (so GPU-accelerated Torch/Demucs stay exactly as configured — meaningfully faster than the CPU-only Torch build Docker installs) and opens the app in a chromeless Edge/Chrome window, so it looks and behaves like a real app rather than a page in your browser.
+
+One-time setup:
+
+```bash
+# build the frontend once, pointed at the port the launcher uses
+cd frontend && VITE_API_BASE_URL=http://localhost:8010 npm run build
+```
+
+```powershell
+# from Windows PowerShell, once — creates the Desktop shortcuts
+powershell -ExecutionPolicy Bypass -File windows\install-shortcuts.ps1
+```
+
+That adds **Guitar Pentatonics** and **Stop Guitar Pentatonics** shortcuts to your Desktop. The first launch starts the backend on port 8010 and opens it in its own app window; the stop shortcut shuts the backend down (your saved songs and cache are untouched — they live in `backend/data`). The scripts assume the WSL distro named in `windows/start.bat`/`run_backend.sh` (edit if yours differs — check with `wsl -l -v`) and port 8010 (chosen to avoid colliding with a `--reload` dev server on the default 8000 — change it in `windows/run_backend.sh` and rebuild the frontend with a matching `VITE_API_BASE_URL` if you'd rather use a different port).
+
 ---
 
 ## Run locally
