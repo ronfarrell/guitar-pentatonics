@@ -17,10 +17,96 @@ logger = logging.getLogger(__name__)
 # collide renaming each other's .part fragments. Serialize per video_id.
 _download_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
+# YouTube signs its media URLs for one specific player client and expires them
+# quickly; when one is rejected mid-download (HTTP 403) the only fix is a fresh
+# extraction, so retry the whole yt-dlp run and force a different client each
+# time instead of hammering the dead URL.
+_PLAYER_CLIENT_FALLBACKS: list[str | None] = [None, "tv", "ios", "web_safari"]
+
+# Ride out transient network/CDN hiccups inside a single yt-dlp run.
+_RETRY_FLAGS = [
+    "--retries", "10",
+    "--fragment-retries", "10",
+    "--extractor-retries", "3",
+]
+
+
+def _is_transient_failure(stderr: str) -> bool:
+    """True for errors a re-extraction with another player client can fix."""
+    text = (stderr or "").lower()
+    return any(
+        marker in text
+        for marker in ("403", "forbidden", "unable to download video data",
+                       "fragment", "read timed out", "connection reset")
+    )
+
+
+async def _run_yt_dlp(
+    cmd: list[str],
+    *,
+    timeout: int,
+    label: str,
+) -> subprocess.CompletedProcess:
+    """Run yt-dlp, retrying transient failures against fallback player clients.
+
+    `cmd` must start with "yt-dlp" and end with the URL; the retry flags and
+    the per-attempt --extractor-args are spliced in just after "yt-dlp".
+    """
+    # `timeout` is the budget for the whole call, not per attempt, so a video
+    # that keeps 403-ing can't stretch the pipeline to four full timeouts.
+    deadline = asyncio.get_running_loop().time() + timeout
+
+    proc = None
+    for attempt, client in enumerate(_PLAYER_CLIENT_FALLBACKS):
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            raise asyncio.TimeoutError
+        extra = list(_RETRY_FLAGS)
+        if client:
+            extra += ["--extractor-args", f"youtube:player_client={client}"]
+        full_cmd = [cmd[0], *extra, *cmd[1:]]
+
+        if attempt:
+            logger.warning(f"[{label}] Retrying with player_client={client}")
+
+        proc = await asyncio.wait_for(
+            asyncio.to_thread(
+                subprocess.run,
+                full_cmd,
+                capture_output=True,
+                text=True,
+                env=env,
+            ),
+            timeout=remaining,
+        )
+
+        if proc.returncode == 0 or not _is_transient_failure(proc.stderr):
+            return proc
+
+        logger.warning(f"[{label}] Attempt {attempt + 1} failed: {proc.stderr.strip()}")
+        await asyncio.sleep(2)
+
+    return proc
+
+
 AUDIO_DIR = Path(__file__).parent.parent.parent / "data" / "audio"
 VIDEO_DIR = Path(__file__).parent.parent.parent / "data" / "videos"
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# yt-dlp leaves "<name>.<ext>.part" / ".ytdl" behind when a download dies
+# partway (e.g. a 403 mid-transfer). Those match a naive "video.*" glob, so the
+# next request would happily serve a truncated file as a cache hit.
+_INCOMPLETE_SUFFIXES = (".part", ".ytdl")
+
+
+def _cached_files(cache_dir: Path, stem: str) -> list[Path]:
+    """Finished files named <stem>.* in cache_dir, ignoring partial downloads."""
+    return sorted(
+        f for f in cache_dir.glob(f"{stem}.*")
+        if f.suffix not in _INCOMPLETE_SUFFIXES
+    )
 
 
 def get_video_id_from_url(youtube_url: str) -> str:
@@ -47,7 +133,7 @@ async def download_youtube_audio(
             cache_dir.mkdir(parents=True, exist_ok=True)
 
             metadata_path = cache_dir / "metadata.json"
-            cached_files = list(cache_dir.glob("audio.*"))
+            cached_files = _cached_files(cache_dir, "audio")
             if cached_files:
                 logger.info(f"[DOWNLOAD] Cache hit: {cached_files[0]}")
                 metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
@@ -73,16 +159,7 @@ async def download_youtube_audio(
 
             metadata = {}  # ALWAYS safe default
 
-            meta_proc = await asyncio.wait_for(
-                asyncio.to_thread(
-                    subprocess.run,
-                    meta_cmd,
-                    capture_output=True,
-                    text=True,
-                    env=env
-                ),
-                timeout=60
-            )
+            meta_proc = await _run_yt_dlp(meta_cmd, timeout=60, label="META")
 
             if meta_proc.returncode == 0 and meta_proc.stdout:
                 metadata = json.loads(meta_proc.stdout.splitlines()[0])
@@ -97,7 +174,10 @@ async def download_youtube_audio(
                 "yt-dlp",
                 "--quiet",
                 "--no-warnings",
-                "--extractor-args", "youtube:player_client=android",
+                # No player_client override: the android client only exposes the
+                # 360p combined format (18, ~96kbps AAC). The default client
+                # negotiation gives real audio-only formats (251/140), which is a
+                # much better source for stem separation.
                 "-f", "bestaudio/best",
                 "-x",
                 "--audio-format", "wav",
@@ -108,16 +188,7 @@ async def download_youtube_audio(
 
             logger.info(f"[DOWNLOAD] Running yt-dlp download...")
 
-            proc = await asyncio.wait_for(
-                asyncio.to_thread(
-                    subprocess.run,
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    env=env
-                ),
-                timeout=600
-            )
+            proc = await _run_yt_dlp(cmd, timeout=600, label="DOWNLOAD")
 
             logger.warning(f"[YT-DLP STDOUT]\n{proc.stdout}")
             if proc.stderr:
@@ -131,7 +202,7 @@ async def download_youtube_audio(
             # -----------------------------
             # STEP 3: find output file
             # -----------------------------
-            files = sorted(cache_dir.glob("audio.*"))
+            files = _cached_files(cache_dir, "audio")
             logger.info(f"[DOWNLOAD] Files found: {[f.name for f in files]}")
 
             if not files:
@@ -202,7 +273,7 @@ async def download_youtube_video(youtube_url: str, progress_tracker: ProgressTra
             # only 360p — treat those as stale so they get upgraded on the next
             # download pass (e.g. a reanalyze) instead of being served forever.
             logger.info(f"[VIDEO] Checking cache: {cache_dir}")
-            cached_files = list(cache_dir.glob("video.*"))
+            cached_files = _cached_files(cache_dir, "video")
             if cached_files:
                 height = _video_height(cached_files[0])
                 if height is None or height >= 720:
@@ -235,17 +306,7 @@ async def download_youtube_video(youtube_url: str, progress_tracker: ProgressTra
 
             logger.info(f"[VIDEO] Running yt-dlp...")
 
-            proc = await asyncio.wait_for(
-                asyncio.to_thread(
-                    subprocess.run,
-                    cmd,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    env=env
-                ),
-                timeout=600
-            )
+            proc = await _run_yt_dlp(cmd, timeout=600, label="VIDEO")
 
             logger.info(f"[VIDEO] Process completed with return code: {proc.returncode}")
 
@@ -257,7 +318,7 @@ async def download_youtube_video(youtube_url: str, progress_tracker: ProgressTra
 
             # Find resulting file
             logger.info(f"[VIDEO] Looking for video files in: {cache_dir}")
-            files = list(cache_dir.glob("video.*"))
+            files = _cached_files(cache_dir, "video")
             logger.info(f"[VIDEO] Found {len(files)} files")
 
             if not files:

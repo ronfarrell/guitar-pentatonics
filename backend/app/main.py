@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import health, analysis, songs
+from app.api import health, analysis, songs, search, playlists
 
 import logging
 
@@ -36,6 +36,8 @@ app.add_middleware(
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(analysis.router, prefix="/analysis", tags=["Analysis"])
 app.include_router(songs.router, prefix="/songs", tags=["Songs"])
+app.include_router(search.router, prefix="/search", tags=["Search"])
+app.include_router(playlists.router, prefix="/playlists", tags=["Playlists"])
 
 
 # -----------------------

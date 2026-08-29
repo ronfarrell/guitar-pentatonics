@@ -7,6 +7,9 @@ Paste a YouTube link, get a live fretboard. The app downloads the audio, detects
 - Chord-by-chord playback tracker (previous / now / next)
 - Toggle triads on the fretboard to see chord tones highlighted
 - Backing-track mode — strip the vocals (Demucs) and play along with the instrumental
+- Per-stem mixer — split into vocals/drums/bass/guitar/piano/other and solo or mute any of them
+- **Beta:** split the guitar stem further into *rhythm* and *lead* — a heuristic (stereo-panning based, with a mono register fallback), so it's approximate and can bleed
+- Music-reactive visualizer — three styles (Orbit / Spectrum / Ribbon) drawn live from the audio, coloured by the chord under the playhead and pulsing on detected beats
 - Customizable fretboard colors (root, triads, scale notes)
 - Previously analyzed songs saved and replayable without re-downloading
 

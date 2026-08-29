@@ -26,6 +26,10 @@ SIX_STEM_MODEL = "htdemucs_6s"
 STEM_NAMES = ["vocals", "drums", "bass", "guitar", "piano", "other"]
 STEMS_DIRNAME = "stems"
 
+# Beta: the guitar stem re-split into rhythm/lead by app.services.guitar_split.
+# These are optional add-ons — a song may have the 6 core stems without them.
+BETA_GUITAR_STEMS = ["guitar_rhythm", "guitar_lead"]
+
 
 def instrumental_path_for(audio_path: str) -> Path:
     """The cached instrumental lives next to the source audio file."""
@@ -44,14 +48,23 @@ def stems_dir_for(audio_path: str) -> Path:
 
 
 def existing_stems(audio_path: str | None) -> dict[str, str] | None:
-    """Return {stem_name: path} if a complete stem set was already generated."""
+    """
+    Return {stem_name: path} if a complete core stem set was already
+    generated. If the beta rhythm/lead guitar split was also produced, those
+    optional stems are included in the returned dict.
+    """
     if not audio_path:
         return None
     stems_dir = stems_dir_for(audio_path)
     stems = {name: stems_dir / f"{name}.mp3" for name in STEM_NAMES}
-    if all(p.exists() for p in stems.values()):
-        return {name: str(p) for name, p in stems.items()}
-    return None
+    if not all(p.exists() for p in stems.values()):
+        return None
+    result = {name: str(p) for name, p in stems.items()}
+    for name in BETA_GUITAR_STEMS:
+        beta_path = stems_dir / f"{name}.mp3"
+        if beta_path.exists():
+            result[name] = str(beta_path)
+    return result
 
 
 def _run_demucs(cmd: list[str], env: dict, on_percent) -> tuple[int, str]:
@@ -251,3 +264,76 @@ async def separate_stems(
         return result
     finally:
         shutil.rmtree(out_dir.parent.parent, ignore_errors=True)
+
+
+async def separate_guitar_roles(
+    audio_path: str,
+    progress: ProgressTracker | None = None,
+) -> dict[str, str]:
+    """
+    Beta: split the guitar stem into rhythm and lead parts.
+
+    Ensures the 6-stem split exists first (running it if needed), then re-mixes
+    the guitar stem into guitar_rhythm/guitar_lead via a heuristic (panning,
+    with a mono register fallback — see app.services.guitar_split). Results are
+    cached alongside the other stems.
+
+    Returns the full stems dict including the two beta stems.
+    """
+    from app.services.guitar_split import split_guitar_roles
+
+    # The role split runs on the guitar stem, so make sure the core stems
+    # exist first. separate_stems is cached, so this is cheap on a re-run.
+    stems = existing_stems(audio_path)
+    if not stems:
+        if progress:
+            progress.update("separating", 5, "Splitting stems first...")
+        stems = await separate_stems(
+            audio_path, progress, finalize=False, band=(5, 70),
+        )
+
+    stems_dir = stems_dir_for(audio_path)
+    rhythm_path = stems_dir / f"{BETA_GUITAR_STEMS[0]}.mp3"
+    lead_path = stems_dir / f"{BETA_GUITAR_STEMS[1]}.mp3"
+
+    if rhythm_path.exists() and lead_path.exists():
+        logger.info(f"[GUITAR-SPLIT] Cache hit: {stems_dir}")
+        if progress:
+            progress.complete("Using cached guitar split")
+        return {**stems, "guitar_rhythm": str(rhythm_path), "guitar_lead": str(lead_path)}
+
+    guitar_stem = stems.get("guitar")
+    if not guitar_stem or not Path(guitar_stem).exists():
+        if progress:
+            progress.error("No guitar stem to split")
+        raise ValueError("Guitar stem not available for role split")
+
+    if progress:
+        progress.update("separating", 75, "Splitting guitar into rhythm & lead...")
+
+    try:
+        method = await asyncio.wait_for(
+            asyncio.to_thread(
+                split_guitar_roles, guitar_stem, str(rhythm_path), str(lead_path)
+            ),
+            timeout=SEPARATION_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        rhythm_path.unlink(missing_ok=True)
+        lead_path.unlink(missing_ok=True)
+        logger.error("[GUITAR-SPLIT] Timed out")
+        if progress:
+            progress.error("Guitar split timed out")
+        raise ValueError("Guitar split timed out")
+    except Exception as e:
+        rhythm_path.unlink(missing_ok=True)
+        lead_path.unlink(missing_ok=True)
+        logger.error(f"[GUITAR-SPLIT] Failed: {e}", exc_info=True)
+        if progress:
+            progress.error("Guitar split failed")
+        raise ValueError(f"Guitar split failed: {e}")
+
+    logger.info(f"[GUITAR-SPLIT] Done via {method} method")
+    if progress:
+        progress.complete("Guitar split ready")
+    return {**stems, "guitar_rhythm": str(rhythm_path), "guitar_lead": str(lead_path)}

@@ -50,7 +50,29 @@ def init_db():
     if "instrumental_path" not in columns:
         logger.info("[DB] Adding instrumental_path column to existing table...")
         cursor.execute("ALTER TABLE analyses ADD COLUMN instrumental_path TEXT")
-    
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS playlists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            position INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Membership is keyed by url_hash, not analyses.id: reanalyzing a song
+    # deletes and reinserts its row (new autoincrement id), which would
+    # silently drop it from every playlist. url_hash is stable per URL.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS playlist_songs (
+            playlist_id INTEGER NOT NULL,
+            url_hash TEXT NOT NULL,
+            position INTEGER NOT NULL DEFAULT 0,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (playlist_id, url_hash)
+        )
+    """)
+
     conn.close()
     logger.info("[DB] Database ready")
 
@@ -214,22 +236,29 @@ def delete_analysis_by_id(song_id: int) -> tuple[str | None, str | None]:
     conn = _get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT audio_path, video_path FROM analyses WHERE id = ?", (song_id,))
+    cursor.execute("SELECT audio_path, video_path, url_hash FROM analyses WHERE id = ?", (song_id,))
     row = cursor.fetchone()
 
     if not row:
         conn.close()
         return None, None
 
-    audio_path, video_path = row
+    audio_path, video_path, url_hash = row
     cursor.execute("DELETE FROM analyses WHERE id = ?", (song_id,))
+    # Deleting a song is permanent, so drop it from any playlist holding it.
+    # (Reanalyze deliberately does not do this — see clear_cache_for_reanalyze.)
+    cursor.execute("DELETE FROM playlist_songs WHERE url_hash = ?", (url_hash,))
     conn.close()
 
     return audio_path, video_path
 
 
 def clear_cache_for_reanalyze(song_id: int) -> tuple[str | None, str | None]:
-    """Delete only the DB record for a song and return (youtube_url, video_title) so the caller can restart analysis."""
+    """Delete only the DB record for a song and return (youtube_url, video_title) so the caller can restart analysis.
+
+    Playlist membership is intentionally left alone: it hangs off url_hash,
+    which the reinserted row reuses, so the song stays in its playlist.
+    """
     init_db()
     conn = _get_db_connection()
     cursor = conn.cursor()

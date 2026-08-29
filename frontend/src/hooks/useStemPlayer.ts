@@ -1,10 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { api, APIError } from "../services/api";
+import { registerMedia } from "../services/audioGraph";
 
 export const STEM_NAMES = ["vocals", "drums", "bass", "guitar", "piano", "other"] as const;
-export type StemName = (typeof STEM_NAMES)[number];
-export type StemMix = Record<StemName, boolean>;
+// Beta: the guitar stem re-split into rhythm/lead. Optional add-ons that only
+// exist once the user runs the guitar split.
+export const BETA_GUITAR_STEMS = ["guitar_rhythm", "guitar_lead"] as const;
+export type StemName =
+  | (typeof STEM_NAMES)[number]
+  | (typeof BETA_GUITAR_STEMS)[number];
+export type StemMix = Record<string, boolean>;
+
+/**
+ * The stems to actually play/show for a given stem set, in a stable order.
+ * When the beta rhythm/lead split exists we surface those two in place of the
+ * combined `guitar` stem (playing all three would double the guitar).
+ */
+export function playableStems(stems: Record<string, string>): StemName[] {
+  const hasRoles = !!stems.guitar_rhythm && !!stems.guitar_lead;
+  const names: StemName[] = [];
+  for (const name of STEM_NAMES) {
+    if (name === "guitar" && hasRoles) {
+      names.push("guitar_rhythm", "guitar_lead");
+    } else if (stems[name]) {
+      names.push(name);
+    }
+  }
+  return names;
+}
 
 export type StemPlayer = {
   /** Mic button: instrumental (vocals-stripped) playback, or the vocals stem when the mixer is active */
@@ -22,6 +46,14 @@ export type StemPlayer = {
   generateStems: () => void;
   stemsBusy: boolean;
   stemsProgress: number;
+  /** Ordered stems to show in the mixer (accounts for the beta guitar split) */
+  mixerStems: StemName[];
+
+  /** Beta: split the guitar stem into rhythm/lead */
+  guitarSplitAvailable: boolean;
+  splitGuitar: () => void;
+  guitarSplitBusy: boolean;
+  guitarSplitProgress: number;
 
   error: string | null;
 };
@@ -33,7 +65,13 @@ const DEFAULT_MIX: StemMix = {
   guitar: true,
   piano: true,
   other: true,
+  guitar_rhythm: true,
+  guitar_lead: true,
 };
+
+// A stem plays unless explicitly muted; keys added mid-session (the beta guitar
+// split) default to audible even when the current mix map predates them.
+const stemOn = (mix: StemMix, name: string) => mix[name] ?? true;
 
 /**
  * Separated-audio playback: the quick "vocals off" backing track and the
@@ -66,6 +104,7 @@ export function useStemPlayer(
 
   const [instrumentalJob, setInstrumentalJob] = useState<{ url: string; progress: number } | null>(null);
   const [stemsJob, setStemsJob] = useState<{ url: string; progress: number } | null>(null);
+  const [guitarSplitJob, setGuitarSplitJob] = useState<{ url: string; progress: number } | null>(null);
   const [failure, setFailure] = useState<{ url: string; message: string } | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -97,6 +136,8 @@ export function useStemPlayer(
   const vocalsOff = mixActive ? !mix.vocals : backingActive;
   const vocalsBusy = !!loadedUrl && instrumentalJob?.url === loadedUrl;
   const stemsBusy = !!loadedUrl && stemsJob?.url === loadedUrl;
+  const guitarSplitBusy = !!loadedUrl && guitarSplitJob?.url === loadedUrl;
+  const guitarSplitAvailable = !!stems?.guitar_rhythm && !!stems?.guitar_lead;
   const error = failure && failure.url === loadedUrl ? failure.message : null;
 
   const toSrc = (path: string) =>
@@ -105,7 +146,7 @@ export function useStemPlayer(
   // The set of audio tracks the engine should be playing right now
   const tracks = useMemo(() => {
     if (mixActive && stems) {
-      return STEM_NAMES.filter((name) => stems[name]).map((name) => ({
+      return playableStems(stems).map((name) => ({
         key: name as string,
         src: toSrc(stems[name]),
       }));
@@ -134,13 +175,20 @@ export function useStemPlayer(
     if (!video || tracks.length === 0) return;
 
     const audios = new Map<string, HTMLAudioElement>();
+    const unregister: Array<() => void> = [];
     for (const t of tracks) {
-      const a = new Audio(t.src);
+      const a = new Audio();
+      // Set before the src: a CORS-clean element is what lets the visualizer
+      // tap this stem when the backend is on another origin.
+      a.crossOrigin = "anonymous";
+      a.src = t.src;
       a.preload = "auto";
       a.volume = video.volume;
       a.playbackRate = video.playbackRate;
-      a.muted = mixActiveRef.current ? !mixRef.current[t.key as StemName] : false;
+      a.muted = mixActiveRef.current ? !stemOn(mixRef.current, t.key) : false;
       audios.set(t.key, a);
+      // These replace the video's own audio, so the visualizer follows them.
+      unregister.push(registerMedia(a));
     }
     audioMapRef.current = audios;
     video.muted = true;
@@ -186,6 +234,7 @@ export function useStemPlayer(
         a.pause();
         a.src = "";
       });
+      unregister.forEach((off) => off());
       audioMapRef.current = new Map();
       video.muted = false;
     };
@@ -194,12 +243,12 @@ export function useStemPlayer(
 
   // Mixer toggles just mute/unmute the already-playing stem elements
   useEffect(() => {
-    if (!mixActive) return;
-    for (const name of STEM_NAMES) {
+    if (!mixActive || !stems) return;
+    for (const name of playableStems(stems)) {
       const a = audioMapRef.current.get(name);
-      if (a) a.muted = !mix[name];
+      if (a) a.muted = !stemOn(mix, name);
     }
-  }, [mix, mixActive]);
+  }, [mix, mixActive, stems]);
 
   function setStemAudible(stem: StemName, on: boolean) {
     if (!loadedUrl) return;
@@ -365,6 +414,43 @@ export function useStemPlayer(
     }
   }
 
+  function splitGuitar() {
+    if (!loadedUrl || guitarSplitBusy) return;
+    void startGuitarSplitJob(loadedUrl);
+  }
+
+  async function startGuitarSplitJob(url: string) {
+    setGuitarSplitJob({ url, progress: 0 });
+    setFailure(null);
+
+    const apply = (result: Record<string, string> | undefined) => {
+      if (!result || !result.guitar_rhythm || !result.guitar_lead) return false;
+      setSessionStems({ url, stems: result });
+      // Keep the mixer active and current toggles; the new role stems default
+      // to audible via stemOn(). Turn the combined guitar off is unnecessary —
+      // playableStems() drops it when the role stems are present.
+      setMixUrl(url);
+      return true;
+    };
+
+    try {
+      const res = await api.analysis.startGuitarSplit(url);
+      if (loadedUrlRef.current !== url) return;
+      if (res.status === "completed") {
+        if (apply(res.stems)) setGuitarSplitJob(null);
+        else {
+          setFailure({ url, message: "Guitar split unavailable" });
+          setGuitarSplitJob(null);
+        }
+        return;
+      }
+      trackJob(url, res.job_id!, setGuitarSplitJob, (r) => apply(r.stems), "Guitar split unavailable");
+    } catch (err) {
+      setFailure({ url, message: err instanceof APIError ? err.message : "Guitar split failed" });
+      setGuitarSplitJob(null);
+    }
+  }
+
   return {
     vocalsOff,
     vocalsBusy,
@@ -378,6 +464,11 @@ export function useStemPlayer(
     generateStems,
     stemsBusy,
     stemsProgress: stemsBusy && stemsJob ? stemsJob.progress : 0,
+    mixerStems: stems ? playableStems(stems) : [],
+    guitarSplitAvailable,
+    splitGuitar,
+    guitarSplitBusy,
+    guitarSplitProgress: guitarSplitBusy && guitarSplitJob ? guitarSplitJob.progress : 0,
     error,
   };
 }

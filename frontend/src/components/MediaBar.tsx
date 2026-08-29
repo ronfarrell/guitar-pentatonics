@@ -1,8 +1,14 @@
 import { useRef, useEffect, useState } from "react";
 import type { RefObject } from "react";
 import type { MediaControls } from "../hooks/useMediaControls";
-import type { StemPlayer } from "../hooks/useStemPlayer";
-import { STEM_NAMES } from "../hooks/useStemPlayer";
+import type { StemPlayer, StemName } from "../hooks/useStemPlayer";
+import type { PlaybackQueue } from "../hooks/usePlaybackQueue";
+
+const STEM_LABELS: Record<string, string> = {
+  guitar_rhythm: "guitar (rhythm)",
+  guitar_lead: "guitar (lead)",
+};
+const stemLabel = (name: StemName) => STEM_LABELS[name] ?? name;
 
 type Props = MediaControls & {
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -10,6 +16,7 @@ type Props = MediaControls & {
   title?: string | null;
   videoKey?: string | null;
   stemPlayer: StemPlayer;
+  queue?: PlaybackQueue;
 };
 
 export default function MediaBar({
@@ -28,6 +35,7 @@ export default function MediaBar({
   title,
   videoKey,
   stemPlayer,
+  queue,
 }: Props) {
   const titleWrapRef = useRef<HTMLDivElement>(null);
   const titleInnerRef = useRef<HTMLSpanElement>(null);
@@ -35,6 +43,9 @@ export default function MediaBar({
 
   const [mixerOpen, setMixerOpen] = useState(false);
   const mixerWrapRef = useRef<HTMLDivElement>(null);
+
+  const [queueOpen, setQueueOpen] = useState(false);
+  const queueWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const outer = titleWrapRef.current;
@@ -53,9 +64,22 @@ export default function MediaBar({
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [mixerOpen]);
 
+  // Same for the queue popover
+  useEffect(() => {
+    if (!queueOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!queueWrapRef.current?.contains(e.target as Node)) setQueueOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [queueOpen]);
+
   if (!videoSrc) return null;
 
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
+  // Track skip only earns its space in the bar once there's an order to skip
+  // through — a playlist playing, or something queued up.
+  const showTrackNav = !!queue && (!!queue.context || queue.queueLength > 0);
 
   return (
     <div className="media-bar">
@@ -159,17 +183,38 @@ export default function MediaBar({
               </div>
             ) : (
               <div className="stem-panel-body">
-                {STEM_NAMES.map((name) => (
+                {stemPlayer.mixerStems.map((name) => (
                   <label key={name} className={`stem-row${stemPlayer.mixActive ? "" : " stem-row--inactive"}`}>
-                    <span className="stem-row-name">{name}</span>
+                    <span className="stem-row-name">{stemLabel(name)}</span>
                     <input
                       type="checkbox"
-                      checked={stemPlayer.mix[name]}
+                      checked={stemPlayer.mix[name] ?? true}
                       disabled={!stemPlayer.mixActive}
                       onChange={(e) => stemPlayer.setStemAudible(name, e.target.checked)}
                     />
                   </label>
                 ))}
+
+                <div className="stem-beta">
+                  {!stemPlayer.guitarSplitAvailable ? (
+                    <button
+                      className="stem-beta-btn"
+                      onClick={stemPlayer.splitGuitar}
+                      disabled={stemPlayer.guitarSplitBusy}
+                    >
+                      {stemPlayer.guitarSplitBusy
+                        ? `Splitting guitar... ${stemPlayer.guitarSplitProgress}%`
+                        : "Split guitar into rhythm & lead"}
+                      <span className="stem-beta-tag">beta</span>
+                    </button>
+                  ) : (
+                    <p className="stem-beta-note">
+                      Guitar split into rhythm &amp; lead (beta — approximate,
+                      expect some bleed).
+                    </p>
+                  )}
+                </div>
+
                 {stemPlayer.error && <p className="stem-panel-error">{stemPlayer.error}</p>}
               </div>
             )}
@@ -177,9 +222,102 @@ export default function MediaBar({
         )}
       </div>
 
+      {showTrackNav && (
+        <button
+          className="media-icon-btn"
+          onClick={queue!.playPrev}
+          disabled={!queue!.hasPrev}
+          aria-label="Previous track"
+          title="Previous track"
+        >
+          ⏮
+        </button>
+      )}
+
       <button className="media-play-btn" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
         {playing ? "⏸" : "▶"}
       </button>
+
+      {showTrackNav && (
+        <button
+          className="media-icon-btn"
+          onClick={queue!.playNext}
+          disabled={!queue!.hasNext}
+          aria-label="Next track"
+          title="Next track"
+        >
+          ⏭
+        </button>
+      )}
+
+      {queue && (
+        <div className="media-queue-wrap" ref={queueWrapRef}>
+          <button
+            className={`media-icon-btn${queue.queueLength > 0 ? " media-icon-btn--active" : ""}`}
+            onClick={() => setQueueOpen((v) => !v)}
+            aria-label="Queue"
+            aria-expanded={queueOpen}
+            title={queue.queueLength > 0 ? `Queue — ${queue.queueLength} up next` : "Queue"}
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="15" y2="6" />
+              <line x1="3" y1="12" x2="15" y2="12" />
+              <line x1="3" y1="18" x2="11" y2="18" />
+              <polygon points="17 14 22 17 17 20" fill="currentColor" stroke="none" />
+            </svg>
+            {queue.queueLength > 0 && (
+              <span className="media-queue-badge">{queue.queueLength}</span>
+            )}
+          </button>
+
+          {queueOpen && (
+            <div className="queue-panel">
+              <div className="queue-panel-header">
+                <span>Up next</span>
+                {queue.upNext.length > 0 && (
+                  <button className="queue-clear-btn" onClick={queue.clearQueue}>
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              <div className="queue-panel-body">
+                {queue.nowPlaying && (
+                  <div className="queue-context">
+                    Playing from <strong>{queue.nowPlaying.name}</strong> ·{" "}
+                    {queue.nowPlaying.position}/{queue.nowPlaying.total}
+                  </div>
+                )}
+
+                {queue.upNext.length === 0 ? (
+                  <p className="queue-panel-hint">
+                    Nothing queued. Use ＋ on a song in your library to line it up.
+                  </p>
+                ) : (
+                  <ul className="queue-list">
+                    {queue.upNext.map((entry, i) => (
+                      <li key={entry.uid} className="queue-row">
+                        <span className="queue-row-num">{i + 1}</span>
+                        <span className="queue-row-title" title={entry.song.title}>
+                          {entry.song.title}
+                        </span>
+                        <button
+                          className="queue-row-remove"
+                          onClick={() => queue.removeQueued(entry.uid)}
+                          aria-label={`Remove ${entry.song.title} from queue`}
+                          title="Remove from queue"
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <span className="media-time">{formatTime(currentTime)}</span>
 
@@ -213,8 +351,24 @@ export default function MediaBar({
         />
       </div>
 
-      {(title || videoKey) && (
+      {(title || videoKey || queue?.nowPlaying) && (
         <div className="media-info">
+          {queue?.nowPlaying && (
+            <span className="media-playlist-tag" title={`Playing from "${queue.nowPlaying.name}"`}>
+              <span className="media-playlist-name">{queue.nowPlaying.name}</span>
+              <span className="media-playlist-pos">
+                {queue.nowPlaying.position}/{queue.nowPlaying.total}
+              </span>
+              <button
+                className="media-playlist-stop"
+                onClick={queue.stopContext}
+                aria-label="Stop playing this playlist"
+                title="Stop playing this playlist"
+              >
+                ✕
+              </button>
+            </span>
+          )}
           {title && (
             <div ref={titleWrapRef} className="media-title-wrap">
               <span

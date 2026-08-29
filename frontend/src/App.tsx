@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import "./App.css";
 
 import Fretboard from "./components/Fretboard";
@@ -8,8 +8,16 @@ import ChordSidebar from "./components/ChordSidebar";
 import FretModeToggle from "./components/FretModeToggle";
 import type { FretMode } from "./components/FretModeToggle";
 import SavedSongs from "./components/SavedSongs";
+import type { SavedSong } from "./services/savedSongsService";
 import MediaBar from "./components/MediaBar";
 import MiniPlayer from "./components/MiniPlayer";
+import Visualizer from "./components/Visualizer";
+import {
+  VISUALIZER_MODES,
+  VIZ_ASPECT_CSS,
+  normalizeVizSettings,
+} from "./components/visualizerModes";
+import type { VisualizerMode, VizSettings } from "./components/visualizerModes";
 
 import type { NoteName } from "./theory/notes";
 import type { ScaleType } from "./theory/scales";
@@ -21,6 +29,8 @@ import { useChordTracker } from "./hooks/useChordTracker";
 import { useSavedSongs } from "./hooks/useSavedSongs";
 import { useMediaControls } from "./hooks/useMediaControls";
 import { useStemPlayer } from "./hooks/useStemPlayer";
+import { usePlaylistStore } from "./hooks/usePlaylistStore";
+import { usePlaybackQueue } from "./hooks/usePlaybackQueue";
 import { isTriadType, matchScaleToKeyQuality } from "./theory/scales";
 import { suggestScales, detectProgression } from "./theory/analysis";
 import { PROGRESSIONS, CUSTOM_PROGRESSION_ID, getChordRoot, isMinorQuality, type ProgressionChord } from "./theory/progressions";
@@ -35,6 +45,27 @@ import type { ThemeSettings } from "./theme/themeSettings";
 
 function extractRoot(chord: string | null): NoteName | null {
   return chord?.match(/^[A-G](#|b)?/)?.[0] as NoteName | null;
+}
+
+const VIZ_STORAGE_KEY = "visualizer";
+
+type VisualizerPref = {
+  on: boolean;
+  mode: VisualizerMode;
+  settings: VizSettings;
+};
+
+function loadVisualizerPref(): VisualizerPref {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(VIZ_STORAGE_KEY) ?? "");
+    return {
+      on: parsed.on === true,
+      mode: VISUALIZER_MODES.includes(parsed.mode) ? parsed.mode : "orbit",
+      settings: normalizeVizSettings(parsed.settings),
+    };
+  } catch {
+    return { on: false, mode: "orbit", settings: normalizeVizSettings(null) };
+  }
 }
 
 function App() {
@@ -53,6 +84,7 @@ function App() {
   const [showTriads, setShowTriads] = useState(false);
   const [customChords, setCustomChords] = useState<ProgressionChord[]>([]);
   const [fretboardColors, setFretboardColors] = useState<FretboardColors>(loadFretboardColors);
+  const [visualizer, setVisualizer] = useState(loadVisualizerPref);
 
   const { savedSongs, deleteSong, startReanalyze, clearReanalyzingId, reanalyzingId, refresh } = useSavedSongs();
 
@@ -73,6 +105,23 @@ function App() {
     analysisData?.instrumental_path ?? null,
     analysisData?.stems ?? null,
   );
+
+  const playlistStore = usePlaylistStore();
+
+  const handleLoadSong = useCallback(
+    (song: SavedSong) => setYoutubeUrl(song.youtubeUrl ?? ""),
+    [],
+  );
+
+  const playback = usePlaybackQueue({
+    songs: savedSongs,
+    videoRef,
+    videoSrc,
+    loadedUrl,
+    loadCached,
+    repeat: mediaControls.repeat,
+    onLoadSong: handleLoadSong,
+  });
 
   // Restore the last session (song + position) once on mount
   const resumeRef = useRef<PlaybackSession | null>(null);
@@ -204,6 +253,10 @@ function App() {
     applyThemeSettings(themeSettings);
   }, [themeSettings]);
 
+  useEffect(() => {
+    localStorage.setItem(VIZ_STORAGE_KEY, JSON.stringify(visualizer));
+  }, [visualizer]);
+
   const progressionLen =
     progressionId === null
       ? 0
@@ -231,6 +284,22 @@ function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [fretMode, progressionId, progressionLen]);
 
+  // Rendered at the page root, and again inside the visualizer when it's
+  // fullscreen and you ask for the full bar — fullscreen only paints the
+  // fullscreen element's own subtree, so the page-level one isn't reachable
+  // from in there.
+  const mediaBar = (
+    <MediaBar
+      videoRef={videoRef}
+      videoSrc={videoSrc}
+      title={analysisData?.video_title}
+      videoKey={analysisData?.key}
+      stemPlayer={stemPlayer}
+      queue={playback}
+      {...mediaControls}
+    />
+  );
+
   return (
     <>
       <main className={`app-shell${videoSrc ? " has-media-bar" : ""}`}>
@@ -254,16 +323,30 @@ function App() {
 
           <SavedSongs
             songs={savedSongs}
+            store={playlistStore}
             onSelectSong={(song) => {
-              const url = song.youtubeUrl ?? "";
-              setYoutubeUrl(url);
+              // Picking a standalone song drops the playlist it was playing
+              // from, but keeps anything the user has queued up.
+              playback.playSong(song, false);
               setMenuOpen(false);
-              loadCached(url);
             }}
+            onPlayPlaylist={(playlist, startSongId) => {
+              playback.playPlaylist(playlist, startSongId);
+              setMenuOpen(false);
+            }}
+            onEnqueueSong={playback.enqueue}
+            onEnqueuePlaylist={(playlist) =>
+              playlist.songIds.forEach((id) => playback.enqueue(id))
+            }
+            nowPlayingPlaylistId={playback.nowPlaying?.playlistId ?? null}
+            nowPlayingSongId={
+              savedSongs.find((s) => s.youtubeUrl === loadedUrl)?.id ?? null
+            }
             onDeleteSong={deleteSong}
             onReanalyzeSong={async (song) => {
               const result = await startReanalyze(song);
               if (!result) return;
+              playback.stopContext();
               setYoutubeUrl(result.youtube_url);
               setMenuOpen(false);
               analyzeWithJobId(result.job_id, result.youtube_url, clearReanalyzingId);
@@ -294,7 +377,7 @@ function App() {
           <Controls
             youtubeUrl={youtubeUrl}
             setYoutubeUrl={setYoutubeUrl}
-            onAnalyze={() => analyze(youtubeUrl)}
+            onAnalyze={(url) => analyze(url)}
             loading={loading}
           />
         </div>
@@ -307,7 +390,44 @@ function App() {
               videoRef={videoRef}
               videoKey={analysisData?.key ?? ""}
               onTogglePlay={mediaControls.togglePlay}
-            />
+              visualizerOn={visualizer.on}
+              onToggleVisualizer={() =>
+                setVisualizer((v) => ({ ...v, on: !v.on }))
+              }
+              stageAspect={
+                visualizer.on ? VIZ_ASPECT_CSS[visualizer.settings.aspect] : null
+              }
+            >
+              {visualizer.on && (
+                <Visualizer
+                  mode={visualizer.mode}
+                  onModeChange={(mode) => setVisualizer((v) => ({ ...v, mode }))}
+                  settings={visualizer.settings}
+                  onSettingsChange={(settings) =>
+                    setVisualizer((v) => ({ ...v, settings }))
+                  }
+                  playing={mediaControls.playing}
+                  chord={currentChord}
+                  chordProgress={progressToNext}
+                  songKey={analysisData?.key ?? null}
+                  songTitle={analysisData?.video_title ?? null}
+                  transport={{
+                    playing: mediaControls.playing,
+                    togglePlay: mediaControls.togglePlay,
+                    playPrev: playback.playPrev,
+                    playNext: playback.playNext,
+                    hasPrev: playback.hasPrev,
+                    hasNext: playback.hasNext,
+                    currentTime: mediaControls.currentTime,
+                    duration: mediaControls.duration,
+                    seek: mediaControls.seek,
+                    formatTime: mediaControls.formatTime,
+                  }}
+                  fullBar={mediaBar}
+                  onTogglePlay={mediaControls.togglePlay}
+                />
+              )}
+            </VideoPlayer>
           )}
         </div>
 
@@ -453,14 +573,7 @@ function App() {
         onTogglePlay={mediaControls.togglePlay}
       />
 
-      <MediaBar
-        videoRef={videoRef}
-        videoSrc={videoSrc}
-        title={analysisData?.video_title}
-        videoKey={analysisData?.key}
-        stemPlayer={stemPlayer}
-        {...mediaControls}
-      />
+      {mediaBar}
 
       <button
         className="settings-fab"

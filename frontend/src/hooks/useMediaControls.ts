@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
+import { loadVolume, saveVolume } from "../services/sessionStore";
 
 export type MediaControls = {
   playing: boolean;
@@ -23,10 +24,12 @@ export function useMediaControls(
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.5);
+  // Restored from the last session; the effect below applies it to the
+  // element as soon as one is mounted.
+  const [volume, setVolume] = useState(loadVolume);
   const [repeat, setRepeat] = useState(false);
   const repeatRef = useRef(false);
-  const volumeRef = useRef(0.5);
+  const volumeRef = useRef(volume);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -41,7 +44,13 @@ export function useMediaControls(
     const onPause = () => setPlaying(false);
     const onTimeUpdate = () => setCurrentTime(video.currentTime);
     const onLoadedMetadata = () => setDuration(video.duration);
-    const onVolumeChange = () => setVolume(video.volume);
+    // The single funnel for level changes — the slider, and anything else
+    // that writes to the element — so persistence can't be bypassed.
+    const onVolumeChange = () => {
+      volumeRef.current = video.volume;
+      setVolume(video.volume);
+      saveVolume(video.volume);
+    };
     const onEnded = () => {
       if (repeatRef.current) {
         video.currentTime = 0;
@@ -99,9 +108,15 @@ export function useMediaControls(
   }
 
   function setVolumeLevel(level: number) {
-    const v = videoRef.current;
-    if (!v) return;
     volumeRef.current = level;
+    saveVolume(level);
+    const v = videoRef.current;
+    // Still worth remembering with no video mounted — that's exactly the
+    // state a refresh lands in.
+    if (!v) {
+      setVolume(level);
+      return;
+    }
     v.volume = level;
   }
 

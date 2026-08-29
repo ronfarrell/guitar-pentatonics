@@ -3,6 +3,10 @@
 ========================= */
 
 :root {
+  /* Shared by the media bar and the settings button parked beside it. The
+     264px reserve is both drawers' 62px peeking edge plus room for the
+     button, on both sides, so the centred bar clears all three. */
+  --media-bar-max: min(880px, calc(100vw - 264px));
   --page-bg: #f1f1f7;
   --surface: #ffffff;
   --surface-strong: #e8e8f2;
@@ -383,6 +387,37 @@ h3 {
   background: var(--accent-soft);
 }
 
+.song-item--playing {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.song-playing-dot {
+  color: var(--accent);
+  font-size: 0.6rem;
+  margin-right: 5px;
+}
+
+.queue-btn {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.queue-btn:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.queue-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .song-info {
   flex: 1;
   cursor: pointer;
@@ -469,6 +504,12 @@ h3 {
   justify-content: space-between;
 }
 
+.saved-songs-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .new-playlist-btn {
   background: none;
   border: 1px solid var(--border);
@@ -485,6 +526,17 @@ h3 {
 .new-playlist-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.new-playlist-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.playlist-error {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: #e5484d;
 }
 
 .playlist-folder {
@@ -509,6 +561,41 @@ h3 {
 .playlist-header.playlist-drag-over {
   background: var(--accent-soft);
   border-color: var(--accent);
+}
+
+.playlist-header--playing {
+  background: var(--accent-soft);
+}
+
+.playlist-play-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font-size: 0.6rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.playlist-play-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--page-bg);
+}
+
+.playlist-play-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.playlist-header--playing .playlist-play-btn {
+  color: var(--accent);
 }
 
 .playlist-toggle {
@@ -934,6 +1021,448 @@ select:disabled {
   display: block;
 }
 
+.video-stage {
+  position: relative;
+}
+
+.video-stage--fixed {
+  overflow: hidden;
+  border-radius: 14px;
+  background: #05050a;
+}
+
+.video-stage--fixed video {
+  height: 100%;
+  object-fit: contain;
+}
+
+
+.video-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* =========================
+   VISUALIZER
+========================= */
+
+/* Covers the video rather than replacing it: the video element stays mounted
+   and keeps driving transport, chord tracking and the stem player. */
+.viz {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #05050a;
+}
+
+.viz:fullscreen {
+  border-radius: 0;
+}
+
+.viz-canvas {
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Title + key, stacked in the top-left corner. Either half can be off. */
+.viz-caption {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  pointer-events: none;
+}
+
+.viz-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.65);
+}
+
+.viz-key {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.65);
+}
+
+.viz-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.82rem;
+  text-align: center;
+  pointer-events: none;
+}
+
+.viz-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.viz:hover .viz-controls,
+.viz:focus-within .viz-controls {
+  opacity: 1;
+}
+
+.viz-mode-btn {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(10, 10, 18, 0.6);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.76rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.viz-mode-btn:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.viz-mode-btn--on {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: transparent;
+  color: #0c0d14;
+}
+
+.viz-controls--pinned {
+  opacity: 1;
+}
+
+/* Settings popover, sitting just above the control row. */
+.viz-settings {
+  position: absolute;
+  right: 12px;
+  bottom: 52px;
+  z-index: 2;
+  width: 232px;
+  max-height: calc(100% - 76px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 10, 18, 0.82);
+  backdrop-filter: blur(10px);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.76rem;
+}
+
+.viz-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.viz-setting--stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.viz-switch {
+  min-width: 46px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.72rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.viz-switch--on {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: transparent;
+  color: #0c0d14;
+}
+
+.viz-switch:disabled,
+.viz-range:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.viz-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 118px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+}
+
+.viz-range--hue {
+  background: linear-gradient(
+    to right,
+    hsl(0, 85%, 60%),
+    hsl(60, 85%, 60%),
+    hsl(120, 85%, 60%),
+    hsl(180, 85%, 60%),
+    hsl(240, 85%, 60%),
+    hsl(300, 85%, 60%),
+    hsl(359, 85%, 60%)
+  );
+}
+
+.viz-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+.viz-range::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+.viz-segmented {
+  display: flex;
+  gap: 4px;
+}
+
+.viz-seg-btn {
+  flex: 1;
+  padding: 4px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.7rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.viz-seg-btn:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.viz-seg-btn--on {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: transparent;
+  color: #0c0d14;
+}
+
+.viz-reset {
+  align-self: flex-end;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.7rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.viz-reset:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Fullscreen transport. Fullscreen paints only the fullscreen element's
+   subtree, so the page's media bar is unreachable from in here and these
+   controls stand in for it. */
+.viz-transport {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 8px 14px;
+
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 10, 18, 0.72);
+  backdrop-filter: blur(10px);
+
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+/* Revealed by any mouse presence, like the mode buttons. */
+.viz:hover .viz-transport,
+.viz:focus-within .viz-transport {
+  opacity: 1;
+}
+
+.viz-tp-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.viz-tp-btn:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.viz-tp-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.viz-tp-btn--play {
+  width: 34px;
+  height: 34px;
+  background: rgba(255, 255, 255, 0.92);
+  border-color: transparent;
+  color: #0c0d14;
+}
+
+.viz-tp-time {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.viz-tp-seek {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 18px;
+  width: min(44vw, 360px);
+  min-width: 120px;
+  cursor: pointer;
+}
+
+.viz-tp-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.viz-tp-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.viz-tp-range {
+  position: absolute;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Shown alongside the expanded media bar, which parks itself at the bottom. */
+.viz-tp-collapse {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 5px 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(10, 10, 18, 0.72);
+  backdrop-filter: blur(10px);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.74rem;
+  font-family: inherit;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.18s ease, color 0.15s ease;
+}
+
+.viz:hover .viz-tp-collapse,
+.viz:focus-within .viz-tp-collapse {
+  opacity: 1;
+}
+
+.viz-tp-collapse:hover {
+  color: #fff;
+}
+
+/* The bottom belongs to the transport in fullscreen, so the mode row and its
+   settings popover move to the top. */
+.viz:fullscreen .viz-controls {
+  top: 14px;
+  bottom: auto;
+}
+
+.viz:fullscreen .viz-settings {
+  top: 56px;
+  bottom: auto;
+}
+
 /* =========================
    MEDIA BAR
 ========================= */
@@ -950,13 +1479,16 @@ select:disabled {
   z-index: 900;
 
   width: max-content;
-  max-width: min(565px, calc(100vw - 32px));
+  /* Wide enough for the full set — restart, repeat, vocals, mixer, prev/play/
+     next, queue, both times, seek, volume and the track info — without any of
+     them shrinking. */
+  max-width: var(--media-bar-max);
   min-width: 280px;
-  padding: 9px 16px;
+  padding: 9px 14px;
 
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1026,6 +1558,146 @@ select:disabled {
   position: relative;
   display: flex;
   flex-shrink: 0;
+}
+
+.media-queue-wrap {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+}
+
+.media-queue-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--page-bg);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-panel {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 12px;
+  z-index: 60;
+}
+
+.queue-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.queue-clear-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.queue-clear-btn:hover {
+  color: var(--accent);
+}
+
+.queue-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.queue-panel-hint {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.queue-context {
+  font-size: 10px;
+  color: var(--muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.queue-context strong {
+  color: var(--accent);
+}
+
+.queue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.queue-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text);
+  padding: 3px 2px;
+  border-radius: 6px;
+}
+
+.queue-row:hover {
+  background: var(--surface-strong);
+}
+
+.queue-row-num {
+  flex-shrink: 0;
+  width: 13px;
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-row-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-row-remove {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.queue-row-remove:hover {
+  color: var(--text);
 }
 
 .stem-panel {
@@ -1110,6 +1782,52 @@ select:disabled {
   margin: 6px 0 0;
 }
 
+.stem-beta {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--accent-border);
+}
+
+.stem-beta-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px dashed var(--accent-border);
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.stem-beta-btn:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.stem-beta-tag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.stem-beta-note {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
 .media-time {
   font-size: 11px;
   color: var(--muted);
@@ -1126,7 +1844,9 @@ select:disabled {
   display: flex;
   align-items: center;
   cursor: pointer;
-  min-width: 80px;
+  /* Also the bar's natural width driver: everything else is content-sized, so
+     this floor is what actually buys the seek bar a usable length. */
+  min-width: 190px;
 }
 
 .media-seek-track {
@@ -1160,16 +1880,21 @@ select:disabled {
   display: flex;
   align-items: center;
   gap: 5px;
-  flex-shrink: 0;
+  /* Shrinks before the track title does, so the title never collapses. */
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .media-vol-icon {
   font-size: 13px;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .media-vol-slider {
   width: 60px;
+  min-width: 30px;
+  flex-shrink: 1;
   accent-color: var(--accent);
   cursor: pointer;
 }
@@ -1178,10 +1903,48 @@ select:disabled {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  min-width: 0;
-  max-width: 140px;
+  /* Keep a floor — without it the title is the only shrinkable item left
+     and gets squeezed to nothing once the bar is full. */
+  min-width: 104px;
+  max-width: 190px;
   flex-shrink: 1;
   overflow: hidden;
+}
+
+.media-playlist-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--accent);
+  min-width: 0;
+}
+
+.media-playlist-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media-playlist-pos {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.media-playlist-stop {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.media-playlist-stop:hover {
+  color: var(--text);
 }
 
 .media-title-wrap {
@@ -1213,6 +1976,42 @@ select:disabled {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Below this there isn't room for one row of everything, and the min-widths
+   above would otherwise push the contents out through the side of the pill. */
+@media (max-width: 560px) {
+  .media-bar {
+    max-width: calc(100vw - 24px);
+    flex-wrap: wrap;
+    justify-content: center;
+    border-radius: 22px;
+    gap: 6px;
+  }
+
+  /* Seek and its two timestamps drop to a row of their own — they're the
+     controls that actually need the length. */
+  .media-time,
+  .media-seek-wrap {
+    order: 10;
+  }
+
+  .media-seek-wrap {
+    min-width: 120px;
+  }
+
+  .media-info {
+    min-width: 70px;
+  }
+
+}
+
+/* Phone-width: the buttons and title win, and volume goes — it's the one
+   control the device's own hardware keys already cover. */
+@media (max-width: 430px) {
+  .media-volume {
+    display: none;
+  }
 }
 
 /* =========================
@@ -1290,9 +2089,12 @@ select:disabled {
 
 .settings-fab {
   position: fixed;
-  bottom: 22px;
-  /* sits just left of the media bar: 283px ≈ half its 565px max-width */
-  left: calc(50% - min(283px, 50vw - 16px) - 50px);
+  bottom: 18px;
+  /* Sits in the gap between the saved-songs drawer and the media bar. The
+     viewport edge is not available: the drawer is fixed at left: 12px with a
+     50px peeking edge and z-index 1001, so anything parked there is simply
+     covered by it. max() is the floor that keeps clear of that peek. */
+  left: max(74px, calc(50% - var(--media-bar-max) / 2 - 54px));
   z-index: 902;
 
   width: 42px;
@@ -1314,6 +2116,14 @@ select:disabled {
 .settings-fab svg {
   width: 18px;
   height: 18px;
+}
+
+/* Too narrow to sit beside the bar — go above it, still clear of the drawer. */
+@media (max-width: 560px) {
+  .settings-fab {
+    bottom: 76px;
+    left: 74px;
+  }
 }
 
 .settings-fab:hover {

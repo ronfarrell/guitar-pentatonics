@@ -1,6 +1,6 @@
 import { useState, useRef, memo } from "react";
 import type { SavedSong } from "../services/savedSongsService";
-import { usePlaylistStore } from "../hooks/usePlaylistStore";
+import type { Playlist, PlaylistStore } from "../hooks/usePlaylistStore";
 
 export type { SavedSong };
 
@@ -8,10 +8,12 @@ type SongItemProps = {
   song: SavedSong;
   playlistId?: string;
   reanalyzingId?: string | null;
+  nowPlaying?: boolean;
   onSelect?: (song: SavedSong) => void;
   onDelete?: (id: string) => void;
   onReanalyze?: (song: SavedSong) => void;
   onRemoveFromPlaylist?: (playlistId: string, songId: string) => void;
+  onEnqueue?: (songId: string) => void;
   onDragStart: (e: React.DragEvent, songId: string) => void;
 };
 
@@ -19,20 +21,39 @@ const SongItem = memo(function SongItem({
   song,
   playlistId,
   reanalyzingId,
+  nowPlaying,
   onSelect,
   onDelete,
   onReanalyze,
   onRemoveFromPlaylist,
+  onEnqueue,
   onDragStart,
 }: SongItemProps) {
   const isReanalyzing = reanalyzingId === song.id;
   return (
-    <li className="song-item" draggable onDragStart={(e) => onDragStart(e, song.id)}>
+    <li
+      className={`song-item${nowPlaying ? " song-item--playing" : ""}`}
+      draggable
+      onDragStart={(e) => onDragStart(e, song.id)}
+    >
       <div className="song-info" onClick={() => onSelect?.(song)}>
-        <div className="song-title">{song.title}</div>
+        <div className="song-title">
+          {nowPlaying && <span className="song-playing-dot" aria-hidden="true">▶</span>}
+          {song.title}
+        </div>
         {song.key && <div className="song-key">{song.key}</div>}
       </div>
       <div className="song-actions">
+        {onEnqueue && (
+          <button
+            className="queue-btn"
+            onClick={() => onEnqueue(song.id)}
+            title="Add to queue"
+            aria-label={`Add ${song.title} to queue`}
+          >
+            ＋
+          </button>
+        )}
         {playlistId && onRemoveFromPlaylist && (
           <button
             className="remove-from-playlist-btn"
@@ -64,13 +85,31 @@ const SongItem = memo(function SongItem({
 
 type Props = {
   songs: SavedSong[];
+  store: PlaylistStore;
   onSelectSong?: (song: SavedSong) => void;
   onDeleteSong?: (id: string) => void;
   onReanalyzeSong?: (song: SavedSong) => void;
+  onPlayPlaylist?: (playlist: Playlist, startSongId?: string) => void;
+  onEnqueueSong?: (songId: string) => void;
+  onEnqueuePlaylist?: (playlist: Playlist) => void;
   reanalyzingId?: string | null;
+  nowPlayingPlaylistId?: string | null;
+  nowPlayingSongId?: string | null;
 };
 
-function SavedSongs({ songs, onSelectSong, onDeleteSong, onReanalyzeSong, reanalyzingId }: Props) {
+function SavedSongs({
+  songs,
+  store,
+  onSelectSong,
+  onDeleteSong,
+  onReanalyzeSong,
+  onPlayPlaylist,
+  onEnqueueSong,
+  onEnqueuePlaylist,
+  reanalyzingId,
+  nowPlayingPlaylistId,
+  nowPlayingSongId,
+}: Props) {
   const [query, setQuery] = useState("");
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -78,8 +117,18 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong, onReanalyzeSong, reanal
   const [editingName, setEditingName] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  const { playlists, createPlaylist, deletePlaylist, renamePlaylist, addSong, removeSong, cleanupSong } =
-    usePlaylistStore();
+  const {
+    playlists,
+    loading,
+    error,
+    createPlaylist,
+    deletePlaylist,
+    renamePlaylist,
+    addSong,
+    removeSong,
+    removeSongEverywhere,
+    cleanupSong,
+  } = store;
 
   const playlistSongIds = new Set(playlists.flatMap((p) => p.songIds));
   const ungroupedSongs = songs.filter((s) => !playlistSongIds.has(s.id));
@@ -99,8 +148,9 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong, onReanalyzeSong, reanal
     });
   }
 
-  function handleNewPlaylist() {
-    const id = createPlaylist("New Playlist");
+  async function handleNewPlaylist() {
+    const id = await createPlaylist("New Playlist");
+    if (!id) return;
     setExpanded((prev) => new Set([...prev, id]));
     setEditingId(id);
     setEditingName("New Playlist");
@@ -140,7 +190,7 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong, onReanalyzeSong, reanal
   function handleDropUngrouped(e: React.DragEvent) {
     e.preventDefault();
     const songId = e.dataTransfer.getData("songId");
-    if (songId) playlists.forEach((p) => removeSong(p.id, songId));
+    if (songId) removeSongEverywhere(songId);
     setDragOverId(null);
   }
 
@@ -149,14 +199,38 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong, onReanalyzeSong, reanal
     onDeleteSong?.(id);
   }
 
+  function handleRandomSong() {
+    // Never re-pick what's already playing, unless it's the only song there is.
+    const pool = songs.filter((s) => s.id !== nowPlayingSongId);
+    const candidates = pool.length > 0 ? pool : songs;
+    if (candidates.length === 0) return;
+    onSelectSong?.(candidates[Math.floor(Math.random() * candidates.length)]);
+  }
+
   return (
     <div className="saved-songs">
       <div className="saved-songs-top">
         <div className="saved-songs-header">
           <h2 className="saved-songs-title">Library</h2>
-          <button className="new-playlist-btn" onClick={handleNewPlaylist} title="New playlist">
-            + Playlist
-          </button>
+          <div className="saved-songs-header-actions">
+            <button
+              className="new-playlist-btn"
+              onClick={handleRandomSong}
+              disabled={songs.length === 0}
+              title={songs.length === 0 ? "No saved songs yet" : "Play a random song"}
+              aria-label="Play a random song"
+            >
+              🎲 Random
+            </button>
+            <button
+              className="new-playlist-btn"
+              onClick={handleNewPlaylist}
+              disabled={loading}
+              title="New playlist"
+            >
+              + Playlist
+            </button>
+          </div>
         </div>
         <input
           value={query}
@@ -164,6 +238,7 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong, onReanalyzeSong, reanal
           placeholder="Search songs or keys..."
           className="saved-songs-input"
         />
+        {error && <div className="playlist-error">{error}</div>}
       </div>
 
       {isSearching ? (
@@ -176,10 +251,11 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong, onReanalyzeSong, reanal
                 key={s.id}
                 song={s}
                 reanalyzingId={reanalyzingId}
+                nowPlaying={nowPlayingSongId === s.id}
                 onSelect={onSelectSong}
                 onDelete={handleDelete}
                 onReanalyze={onReanalyzeSong}
-                onRemoveFromPlaylist={removeSong}
+                onEnqueue={onEnqueueSong}
                 onDragStart={handleDragStart}
               />
             ))
@@ -193,15 +269,32 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong, onReanalyzeSong, reanal
               .filter(Boolean) as SavedSong[];
             const isOpen = expanded.has(playlist.id);
             const isDragTarget = dragOverId === playlist.id;
+            const isPlaying = nowPlayingPlaylistId === playlist.id;
 
             return (
               <div key={playlist.id} className="playlist-folder">
                 <div
-                  className={`playlist-header${isDragTarget ? " playlist-drag-over" : ""}`}
+                  className={`playlist-header${isDragTarget ? " playlist-drag-over" : ""}${
+                    isPlaying ? " playlist-header--playing" : ""
+                  }`}
                   onDragOver={(e) => handleDragOver(e, playlist.id)}
                   onDragLeave={() => setDragOverId(null)}
                   onDrop={(e) => handleDrop(e, playlist.id)}
                 >
+                  <button
+                    className="playlist-play-btn"
+                    onClick={() => onPlayPlaylist?.(playlist)}
+                    disabled={playlistSongs.length === 0}
+                    title={
+                      playlistSongs.length === 0
+                        ? "Playlist is empty"
+                        : `Play "${playlist.name}"`
+                    }
+                    aria-label={`Play ${playlist.name}`}
+                  >
+                    ▶
+                  </button>
+
                   <button
                     className="playlist-toggle"
                     onClick={() => toggleExpanded(playlist.id)}
@@ -234,6 +327,18 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong, onReanalyzeSong, reanal
                     <span className="playlist-count">{playlistSongs.length}</span>
                   </button>
 
+                  {onEnqueuePlaylist && (
+                    <button
+                      className="queue-btn"
+                      onClick={() => onEnqueuePlaylist(playlist)}
+                      disabled={playlistSongs.length === 0}
+                      title="Add playlist to queue"
+                      aria-label={`Add ${playlist.name} to queue`}
+                    >
+                      ＋
+                    </button>
+                  )}
+
                   <button
                     className="delete-btn"
                     onClick={() => deletePlaylist(playlist.id)}
@@ -254,10 +359,14 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong, onReanalyzeSong, reanal
                           song={s}
                           playlistId={playlist.id}
                           reanalyzingId={reanalyzingId}
-                          onSelect={onSelectSong}
+                          nowPlaying={isPlaying && nowPlayingSongId === s.id}
+                          // Clicking a song inside a playlist plays the whole
+                          // playlist from that point, not just the one song.
+                          onSelect={(song) => onPlayPlaylist?.(playlist, song.id)}
                           onDelete={handleDelete}
                           onReanalyze={onReanalyzeSong}
                           onRemoveFromPlaylist={removeSong}
+                          onEnqueue={onEnqueueSong}
                           onDragStart={handleDragStart}
                         />
                       ))
@@ -287,10 +396,11 @@ function SavedSongs({ songs, onSelectSong, onDeleteSong, onReanalyzeSong, reanal
                 key={s.id}
                 song={s}
                 reanalyzingId={reanalyzingId}
+                nowPlaying={!nowPlayingPlaylistId && nowPlayingSongId === s.id}
                 onSelect={onSelectSong}
                 onDelete={handleDelete}
                 onReanalyze={onReanalyzeSong}
-                onRemoveFromPlaylist={removeSong}
+                onEnqueue={onEnqueueSong}
                 onDragStart={handleDragStart}
               />
             ))

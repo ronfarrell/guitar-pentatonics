@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from app.services.storage import list_all_analyses, delete_analysis_by_id, clear_cache_for_reanalyze
 from app.services.analysis import process_youtube_video
+from app.services.background import spawn
 from app.models.analysis import AnalysisRequest
 
 import logging
@@ -78,13 +79,14 @@ async def reanalyze_song(song_id: int):
     job_id = str(uuid.uuid4())
     logger.info(f"[REANALYZE] Starting job {job_id} for song {song_id}: {youtube_url}")
 
-    asyncio.create_task(
+    spawn(
         process_youtube_video(
             AnalysisRequest(youtube_url=youtube_url),
             job_id,
             preserved_title=video_title,
             use_instrumental=True,
-        )
+        ),
+        f"reanalyze:{job_id}",
     )
 
     return {"job_id": job_id, "youtube_url": youtube_url}

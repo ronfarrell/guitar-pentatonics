@@ -18,6 +18,28 @@ export type AnalysisDemoResponse = {
   video_title?: string;
 };
 
+export type YouTubeSearchResult = {
+  video_id: string;
+  title: string;
+  channel: string;
+  duration: number | null;
+  view_count: number | null;
+  thumbnail: string;
+  url: string;
+};
+
+export type YouTubeSearchResponse = {
+  query: string;
+  results: YouTubeSearchResult[];
+};
+
+export type ApiPlaylist = {
+  id: number;
+  name: string;
+  created_at: string | null;
+  song_ids: number[];
+};
+
 export type InstrumentalStartResponse = {
   status: 'completed' | 'processing';
   job_id?: string;
@@ -65,6 +87,9 @@ async function fetchAPI<T>(
     return await response.json();
   } catch (err) {
     if (err instanceof APIError) throw err;
+    // Aborted requests (superseded search keystrokes) are not failures —
+    // let callers detect and ignore them.
+    if (err instanceof DOMException && err.name === 'AbortError') throw err;
     throw new APIError(0, `Failed to reach API: ${err}`);
   }
 }
@@ -73,6 +98,13 @@ async function fetchAPI<T>(
 export const api = {
   health: {
     check: () => fetchAPI<HealthResponse>('/health/'),
+  },
+  search: {
+    youtube: (query: string, limit = 10, signal?: AbortSignal) =>
+      fetchAPI<YouTubeSearchResponse>(
+        `/search/?q=${encodeURIComponent(query)}&limit=${limit}`,
+        { signal }
+      ),
   },
   analysis: {
     demo: () => fetchAPI<AnalysisDemoResponse>('/analysis/demo'),
@@ -107,6 +139,46 @@ export const api = {
       fetchAPI<StemsStartResponse>('/analysis/stems/start', {
         method: 'POST',
         body: JSON.stringify({ youtube_url: youtubeUrl }),
+      }),
+    startGuitarSplit: (youtubeUrl: string) =>
+      fetchAPI<StemsStartResponse>('/analysis/guitar-split/start', {
+        method: 'POST',
+        body: JSON.stringify({ youtube_url: youtubeUrl }),
+      }),
+  },
+  playlists: {
+    list: () => fetchAPI<{ playlists: ApiPlaylist[] }>('/playlists'),
+    create: (name: string) =>
+      fetchAPI<ApiPlaylist>('/playlists', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
+    rename: (id: number, name: string) =>
+      fetchAPI<ApiPlaylist>(`/playlists/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name }),
+      }),
+    remove: (id: number) =>
+      fetchAPI<{ status: string; id: number }>(`/playlists/${id}`, {
+        method: 'DELETE',
+      }),
+    addSong: (id: number, songId: number) =>
+      fetchAPI<ApiPlaylist>(`/playlists/${id}/songs`, {
+        method: 'POST',
+        body: JSON.stringify({ song_id: songId }),
+      }),
+    removeSong: (id: number, songId: number) =>
+      fetchAPI<ApiPlaylist>(`/playlists/${id}/songs/${songId}`, {
+        method: 'DELETE',
+      }),
+    removeSongEverywhere: (songId: number) =>
+      fetchAPI<{ status: string; song_id: number }>(`/playlists/songs/${songId}`, {
+        method: 'DELETE',
+      }),
+    reorder: (id: number, songIds: number[]) =>
+      fetchAPI<ApiPlaylist>(`/playlists/${id}/songs`, {
+        method: 'PUT',
+        body: JSON.stringify({ song_ids: songIds }),
       }),
   },
 };

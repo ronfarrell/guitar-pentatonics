@@ -9,9 +9,12 @@ from app.services.separation import (
     separate_instrumental,
     existing_instrumental,
     separate_stems,
+    separate_guitar_roles,
     existing_stems,
+    BETA_GUITAR_STEMS,
 )
 from app.services.storage import get_cached_analysis, set_instrumental_path
+from app.services.background import spawn
 import logging
 import uuid
 import asyncio
@@ -61,9 +64,7 @@ async def start_analysis(request: AnalysisRequest) -> dict:
     logger.info(f"Started analysis job {job_id} for: {request.youtube_url}")
     
     # Start the analysis in background
-    asyncio.create_task(
-        process_youtube_video(request, job_id)
-    )
+    spawn(process_youtube_video(request, job_id), f"analysis:{job_id}")
     
     return {"job_id": job_id, "status": "processing"}
 
@@ -190,7 +191,7 @@ async def start_instrumental(request: AnalysisRequest) -> dict:
         except Exception as e:
             logger.error(f"Separation job {job_id} failed: {e}", exc_info=True)
 
-    asyncio.create_task(run_separation())
+    spawn(run_separation(), f"separation:{job_id}")
     return {"job_id": job_id, "status": "processing"}
 
 
@@ -222,7 +223,39 @@ async def start_stems(request: AnalysisRequest) -> dict:
         except Exception as e:
             logger.error(f"Stem split job {job_id} failed: {e}", exc_info=True)
 
-    asyncio.create_task(run_split())
+    spawn(run_split(), f"split:{job_id}")
+    return {"job_id": job_id, "status": "processing"}
+
+
+@router.post("/guitar-split/start")
+async def start_guitar_split(request: AnalysisRequest) -> dict:
+    """
+    Beta: split the guitar stem into rhythm/lead parts for an already-analyzed
+    song. Ensures the 6-stem split exists first (running it if needed).
+
+    Returns {"status": "completed", "stems": {...}} if the split already
+    exists, otherwise {"job_id": ..., "status": "processing"} for tracking via
+    the existing /progress and /stream endpoints.
+    """
+    cached = get_cached_analysis(request.youtube_url)
+    if not cached or not cached.audio_path:
+        raise HTTPException(status_code=404, detail="Song has not been analyzed yet")
+
+    stems = existing_stems(cached.audio_path)
+    if stems and all(name in stems for name in BETA_GUITAR_STEMS):
+        return {"status": "completed", "stems": stems}
+
+    job_id = str(uuid.uuid4())
+    logger.info(f"Started guitar-split job {job_id} for: {request.youtube_url}")
+
+    async def run_guitar_split():
+        progress = ProgressTracker(job_id)
+        try:
+            await separate_guitar_roles(cached.audio_path, progress)
+        except Exception as e:
+            logger.error(f"Guitar-split job {job_id} failed: {e}", exc_info=True)
+
+    spawn(run_guitar_split(), f"guitar-split:{job_id}")
     return {"job_id": job_id, "status": "processing"}
 
 
