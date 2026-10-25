@@ -1,0 +1,557 @@
+/* =========================
+   TV MODE
+   Always dark: it's a living-room screen, usually in a dim room, and the
+   video/visualizer read best on black whatever theme the laptop uses.
+========================= */
+
+.tv-root {
+  --page-bg: #07070c;
+  --surface: #12131c;
+  --surface-strong: #1c1d2c;
+  --text: #eceef8;
+  --muted: #8a8fb0;
+  --border: #252638;
+  --accent-soft: #1d1a3e;
+  --accent-border: rgba(139, 127, 247, 0.32);
+
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: var(--page-bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* ---------- start / ended screen ---------- */
+
+.tv-start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.tv-start-card {
+  max-width: 560px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: center;
+}
+
+.tv-start-lead {
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.tv-start-owner {
+  margin: 0;
+  font-weight: 600;
+}
+
+.tv-start-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.tv-big-btn {
+  font-size: 1.05rem;
+  padding: 14px 28px;
+  border-radius: 14px;
+}
+
+.tv-address {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.tv-address code {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.tv-address-edit {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.tv-net-warning {
+  text-align: left;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #f5c76a;
+  background: rgba(245, 165, 36, 0.1);
+  border: 1px solid rgba(245, 165, 36, 0.3);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.tv-net-warning code {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+.tv-link-btn {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.tv-start-exit {
+  align-self: center;
+}
+
+/* ---------- live screen ---------- */
+
+.tv-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2vh;
+  padding: 2vh 2vw;
+  cursor: none;
+}
+
+.tv-screen--chrome {
+  cursor: default;
+}
+
+.tv-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(240px, 22vw, 380px);
+  gap: 1.5vw;
+}
+
+.tv-stage {
+  position: relative;
+  min-height: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #000;
+}
+
+.tv-stage video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.tv-video--idle {
+  visibility: hidden;
+}
+
+/* The visualizer's own buttons are for mice; the phones run the TV. */
+.tv-stage .viz {
+  border-radius: 0;
+}
+
+.tv-stage .viz-controls,
+.tv-stage .viz-transport,
+.tv-stage .viz-settings,
+.tv-stage .viz-hint {
+  display: none !important;
+}
+
+.tv-stage .viz-canvas {
+  cursor: none;
+}
+
+/* ---------- idle: big QR ---------- */
+
+.tv-idle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4vw;
+  padding: 4vw;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(139, 127, 247, 0.18), transparent 55%),
+    var(--surface);
+}
+
+.tv-idle-text {
+  max-width: 460px;
+}
+
+.tv-idle-text h1 {
+  font-size: clamp(2rem, 4vw, 3.6rem);
+  margin: 0 0 12px;
+}
+
+.tv-idle-text p {
+  color: var(--muted);
+  font-size: clamp(1rem, 1.4vw, 1.3rem);
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+
+.tv-join-url {
+  display: inline-block;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 8px;
+  padding: 6px 10px;
+  word-break: break-all;
+  margin-bottom: 14px;
+}
+
+.tv-idle-host {
+  font-weight: 600;
+  color: var(--text) !important;
+}
+
+.qr-code {
+  flex: none;
+  background: #fff;
+  border-radius: 14px;
+  padding: 10px;
+  box-sizing: content-box;
+}
+
+.qr-code img {
+  display: block;
+}
+
+.tv-qr-missing {
+  width: 300px;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  color: var(--muted);
+}
+
+/* ---------- now playing overlay ---------- */
+
+.tv-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 6vh 2vw 2vh;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.45) 60%, transparent);
+  pointer-events: none;
+}
+
+.tv-eyebrow {
+  display: block;
+  font-size: clamp(0.7rem, 0.9vw, 0.9rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.tv-now-title {
+  font-size: clamp(1.4rem, 2.6vw, 2.6rem);
+  margin: 0;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-now-meta {
+  display: flex;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: clamp(0.9rem, 1.2vw, 1.2rem);
+  margin-top: 4px;
+}
+
+.tv-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 1.4vh;
+  color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(0.8rem, 1vw, 1rem);
+}
+
+.tv-progress-track {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.tv-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.9s linear;
+}
+
+.tv-click-resume {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ---------- sidebar ---------- */
+
+.tv-side {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tv-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.6vh 1.2vw;
+}
+
+.tv-panel--join {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.tv-panel--join .qr-code {
+  padding: 6px;
+  border-radius: 10px;
+}
+
+.tv-muted {
+  color: var(--muted);
+  margin: 4px 0 0;
+  font-size: clamp(0.85rem, 1vw, 1rem);
+}
+
+.tv-upnext {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2vh;
+}
+
+.tv-upnext li {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tv-upnext-title {
+  font-weight: 600;
+  font-size: clamp(0.9rem, 1.1vw, 1.15rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-upnext-first .tv-upnext-title {
+  font-size: clamp(1rem, 1.35vw, 1.4rem);
+}
+
+.tv-upnext-by {
+  color: var(--muted);
+  font-size: clamp(0.75rem, 0.9vw, 0.9rem);
+}
+
+.tv-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.tv-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 3px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  font-size: 0.85rem;
+}
+
+.tv-member-initial {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+}
+
+.tv-member--guest .tv-member-initial {
+  background: var(--muted);
+}
+
+.tv-member-name {
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-member--guest {
+  background: var(--surface-strong);
+  border-color: var(--border);
+}
+
+.tv-warn {
+  color: #f5a524;
+  margin: 0;
+}
+
+/* ---------- fretboard strip ---------- */
+
+.tv-fretboard {
+  flex: none;
+}
+
+.tv-fretboard .fretboard-card {
+  padding: 1.2vh 1.2vw;
+  border-radius: 16px;
+}
+
+/* Desktop sizes the grid in fixed px and scrolls; the TV has a known width,
+   so stretch the frets across it and keep the rows short enough that the
+   video keeps most of the screen. */
+.tv-fretboard .fretboard-title {
+  margin-bottom: 0.6vh;
+}
+
+.tv-fretboard .fretboard-title h2 {
+  font-size: clamp(1rem, 1.3vw, 1.4rem);
+}
+
+.tv-fretboard .fretboard-label,
+.tv-fretboard .scale-meta {
+  display: none;
+}
+
+.tv-fretboard .chord-cards-wrap {
+  margin: 0 0 0.8vh;
+}
+
+.tv-fretboard .chord-card {
+  padding: 0.5vh 8px;
+}
+
+.tv-fretboard .fretboard-scroll {
+  overflow: hidden;
+}
+
+.tv-fretboard .fretboard-grid {
+  width: 100%;
+  gap: 0.45vh;
+}
+
+.tv-fretboard .fretboard-row {
+  grid-template-columns: 3.2vw repeat(23, minmax(0, 1fr));
+  gap: 0.3vw;
+}
+
+.tv-fretboard .fret-cell,
+.tv-fretboard .string-name {
+  min-height: 3.1vh;
+  font-size: clamp(0.7rem, 0.8vw, 0.95rem);
+  border-radius: 7px;
+}
+
+.tv-fretboard .header-row .header-cell {
+  min-height: 2.2vh;
+}
+
+/* Colour settings are a mouse thing too. */
+.tv-fretboard .fb-settings-anchor {
+  display: none;
+}
+
+/* ---------- notices + chrome ---------- */
+
+.tv-notices {
+  position: fixed;
+  top: 3vh;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.tv-notice {
+  background: rgba(18, 19, 28, 0.92);
+  border: 1px solid var(--accent-border);
+  color: var(--text);
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: clamp(0.95rem, 1.2vw, 1.2rem);
+  font-weight: 600;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  animation: tv-notice-in 0.25s ease;
+}
+
+@keyframes tv-notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.tv-chrome {
+  position: fixed;
+  top: 2vh;
+  right: 2vw;
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 4;
+}
+
+.tv-screen--chrome .tv-chrome {
+  opacity: 1;
+  pointer-events: auto;
+}

@@ -1,0 +1,417 @@
+/* =========================
+   PHONE CONTROLLER
+========================= */
+
+/* The app's #root is a centred desktop column; on the remote it's the whole phone. */
+#root:has(.ctl) {
+  padding: 0;
+  max-width: none;
+}
+
+.ctl {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--page-bg);
+}
+
+.ctl-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.ctl-header-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ctl-header-text strong {
+  font-size: 15px;
+}
+
+.ctl-header-text span {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctl-leave {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ctl-body {
+  flex: 1;
+  padding: 14px 16px 96px;
+  max-width: 560px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.ctl-empty {
+  text-align: center;
+  color: var(--muted);
+  margin-top: 30vh;
+}
+
+.ctl-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ctl-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.ctl-muted {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.ctl-row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ---------- now playing ---------- */
+
+.ctl-now-title {
+  font-size: 20px;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.ctl-seek,
+.ctl-volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ctl-seek input,
+.ctl-volume input {
+  flex: 1;
+  accent-color: var(--accent);
+  min-width: 0;
+}
+
+.ctl-transport {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  margin: 4px 0;
+}
+
+.ctl-transport button {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--text);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.ctl-transport .ctl-play {
+  width: 68px;
+  height: 68px;
+  font-size: 26px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.ctl-transport button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ctl-transport svg {
+  width: 22px;
+  height: 22px;
+}
+
+.ctl-transport .ctl-play svg {
+  width: 30px;
+  height: 30px;
+}
+
+.ctl-transport button:disabled {
+  opacity: 0.4;
+}
+
+.ctl-volume svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.ctl-link {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+/* ---------- lists ---------- */
+
+.ctl-queue,
+.ctl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ctl-queue li,
+.ctl-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.ctl-queue li:first-child,
+.ctl-list li:first-child {
+  border-top: none;
+}
+
+.ctl-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0 14px;
+}
+
+.ctl-queue-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ctl-queue-title {
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctl-queue-actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.ctl-queue-actions button {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ctl-queue-actions button:disabled {
+  opacity: 0.35;
+}
+
+.ctl-queue-actions .ctl-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-size: 18px;
+}
+
+.ctl-queue-actions .ctl-wide {
+  font-size: 13px;
+}
+
+.ctl-add,
+.ctl-display {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ctl-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 90px;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: var(--page-bg);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  max-width: calc(100vw - 48px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+/* ---------- display tab ---------- */
+
+.ctl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ctl-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ctl-switch {
+  flex: none;
+  position: relative;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+
+.ctl-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+
+.ctl-switch--on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.ctl-switch--on::after {
+  transform: translateX(18px);
+}
+
+/* ---------- bottom tabs ---------- */
+
+.ctl-tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 5;
+}
+
+.ctl-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ctl-tab-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.ctl-tab--on {
+  color: var(--accent);
+}
+
+/* ---------- join screen ---------- */
+
+.ctl-guest {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.ctl-guest .account-row {
+  flex-wrap: nowrap;
+}
+
+.ctl-guest .settings-cancel-btn {
+  flex: none;
+  white-space: nowrap;
+}
+
+.ctl-or {
+  align-self: center;
+  font-size: 12px;
+  color: var(--muted);
+}
