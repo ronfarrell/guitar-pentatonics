@@ -106,6 +106,19 @@ def init_db():
         )
     """)
 
+    # TV-mode rooms, saved so a backend restart (or a dev --reload) is a
+    # reconnect blip rather than the end of the party. `state` is JSON:
+    # queue, now playing, history, display settings.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS rooms (
+            id TEXT PRIMARY KEY,
+            owner_id INTEGER NOT NULL,
+            owner_name TEXT NOT NULL,
+            state TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # Playlists predate users; rows left NULL are claimed by the first account.
     cursor.execute("PRAGMA table_info(playlists)")
     if "user_id" not in [col[1] for col in cursor.fetchall()]:
@@ -396,3 +409,31 @@ def list_library(user_id: int, limit: int = 100):
     conn.close()
 
     return rows
+
+
+def get_library_song(user_id: int, song_id: int) -> dict | None:
+    """One song from a user's library, with what a shared queue needs to show it."""
+    init_db()
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT a.id, a.youtube_url, a.url_hash, a.video_title, a.key
+        FROM analyses a
+        JOIN user_songs us ON us.url_hash = a.url_hash AND us.user_id = ?
+        WHERE a.id = ?
+        """,
+        (user_id, song_id),
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return None
+    return {
+        "song_id": row[0],
+        "youtube_url": row[1],
+        "url_hash": row[2],
+        "title": row[3] or "Untitled",
+        "key": row[4],
+    }

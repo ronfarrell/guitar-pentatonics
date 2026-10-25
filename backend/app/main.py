@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import health, auth, analysis, songs, search, playlists
+from app.api import health, auth, analysis, songs, search, playlists, rooms
 
 import logging
 
@@ -39,6 +39,7 @@ app.include_router(analysis.router, prefix="/analysis", tags=["Analysis"])
 app.include_router(songs.router, prefix="/songs", tags=["Songs"])
 app.include_router(search.router, prefix="/search", tags=["Search"])
 app.include_router(playlists.router, prefix="/playlists", tags=["Playlists"])
+app.include_router(rooms.router, prefix="/rooms", tags=["Rooms"])
 
 
 # -----------------------

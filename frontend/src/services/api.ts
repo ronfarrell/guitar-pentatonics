@@ -3,7 +3,40 @@ import { authHeaders, notifyUnauthorized } from './authToken';
 // Environment configuration
 // Empty string = relative URLs, used in Docker where nginx proxies API routes to the backend.
 // Falls back to localhost:8000 for local dev without a .env.local file.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+const CONFIGURED_API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
+
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * A build pointed at "localhost" is right on the machine running it and wrong
+ * everywhere else: a phone that scanned the TV's QR code would go looking for
+ * a server on itself. When the page is being viewed from another device, keep
+ * the configured port but swap in the host the page itself came from.
+ */
+function resolveApiBase(configured: string): string {
+  if (!configured || typeof window === 'undefined') return configured;
+  try {
+    const url = new URL(configured);
+    if (LOOPBACK.has(url.hostname) && !LOOPBACK.has(window.location.hostname)) {
+      url.hostname = window.location.hostname;
+    }
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return configured;
+  }
+}
+
+export const API_BASE_URL = resolveApiBase(CONFIGURED_API_BASE_URL);
+
+/** URL for a cached media file the backend serves (`kind` = audio | video). */
+export const mediaUrl = (kind: 'audio' | 'video', path: string) =>
+  `${API_BASE_URL}/analysis/${kind}/${path}`;
+
+/** The same server over WebSocket: http→ws, https→wss, relative→this origin. */
+export function wsUrl(path: string): string {
+  const base = API_BASE_URL || window.location.origin;
+  return base.replace(/^http/, 'ws') + path;
+}
 
 // Response types (shared with backend responses)
 export type HealthResponse = {
@@ -52,6 +85,48 @@ export type ApiUser = {
 export type AuthResponse = {
   token: string;
   user: ApiUser;
+};
+
+export type RoomEntry = {
+  uid: string;
+  url_hash: string;
+  title: string;
+  key: string;
+  added_by: string;
+  added_by_id: string;
+};
+
+export type RoomDisplay = {
+  view: 'video' | 'visualizer';
+  viz_mode: string;
+  show_fretboard: boolean;
+  show_chords: boolean;
+  fret_mode: 'song' | 'live';
+  scale_type: string;
+  show_triads: boolean;
+};
+
+export type RoomPlayback = {
+  playing: boolean;
+  position: number;
+  duration: number;
+  volume: number;
+  /** Server time (seconds) the report arrived, for extrapolating the playhead. */
+  at?: number;
+};
+
+export type RoomMember = { id: string; name: string; guest: boolean };
+
+export type RoomState = {
+  room_id: string;
+  owner: string;
+  tv_connected: boolean;
+  now_playing: RoomEntry | null;
+  queue: RoomEntry[];
+  has_history: boolean;
+  display: RoomDisplay;
+  playback: RoomPlayback;
+  members: RoomMember[];
 };
 
 export type InstrumentalStartResponse = {
@@ -212,6 +287,26 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ youtube_url: youtubeUrl }),
       }),
+  },
+  rooms: {
+    create: () => fetchAPI<{ room_id: string }>('/rooms', { method: 'POST' }),
+    info: (roomId: string) =>
+      fetchAPI<{ room_id: string; owner: string; tv_connected: boolean }>(
+        `/rooms/${encodeURIComponent(roomId)}`
+      ),
+    end: (roomId: string) =>
+      fetchAPI<{ status: string }>(`/rooms/${encodeURIComponent(roomId)}`, { method: 'DELETE' }),
+    song: (roomId: string, urlHash: string) =>
+      fetchAPI<AnalysisDemoResponse>(
+        `/rooms/${encodeURIComponent(roomId)}/songs/${encodeURIComponent(urlHash)}`
+      ),
+    network: () =>
+      fetchAPI<{
+        base_url: string | null;
+        source: string;
+        /** 'wsl-nat': the address is right, but WSL isn't letting the LAN in yet. */
+        warning: string | null;
+      }>('/rooms/network'),
   },
   playlists: {
     list: () => fetchAPI<{ playlists: ApiPlaylist[] }>('/playlists'),

@@ -1,4 +1,5 @@
 import { authHeaders, notifyUnauthorized } from "./authToken";
+import { API_BASE_URL } from "./api";
 
 type ApiSong = {
   id: number;
@@ -15,8 +16,6 @@ export type SavedSong = {
   createdAt?: string;
 };
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 async function authedFetch(url: string, init?: RequestInit) {
   const res = await fetch(url, { ...init, headers: { ...authHeaders(), ...init?.headers } });

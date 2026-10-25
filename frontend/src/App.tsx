@@ -42,7 +42,7 @@ import type { PlaybackSession } from "./services/sessionStore";
 import SettingsPage from "./components/SettingsPage";
 import { loadThemeSettings, saveThemeSettings, applyThemeSettings } from "./theme/themeSettings";
 import type { ThemeSettings } from "./theme/themeSettings";
-import type { ApiUser } from "./services/api";
+import { mediaUrl, type ApiUser } from "./services/api";
 
 function extractRoot(chord: string | null): NoteName | null {
   return chord?.match(/^[A-G](#|b)?/)?.[0] as NoteName | null;
@@ -77,9 +77,10 @@ type AppProps = {
   user: ApiUser;
   onUserChange: (user: ApiUser) => void;
   onLogout: () => void;
+  onEnterTv: () => void;
 };
 
-function App({ user, onUserChange, onLogout }: AppProps) {
+function App({ user, onUserChange, onLogout, onEnterTv }: AppProps) {
   const [root, setRoot] = useState<NoteName>(ROOT_NOTES[0]);
   const [scaleType, setScaleType] = useState<ScaleType>("Major Pentatonic");
   const [youtubeUrl, setYoutubeUrl] = useState("");
@@ -105,7 +106,7 @@ function App({ user, onUserChange, onLogout }: AppProps) {
     useChordTracker(analysisData);
 
   const videoSrc = analysisData?.video_path
-    ? `${import.meta.env.VITE_API_BASE_URL}/analysis/video/${analysisData.video_path}`
+    ? mediaUrl("video", analysisData.video_path)
     : null;
 
   const mediaControls = useMediaControls(videoRef, videoSrc);
@@ -319,6 +320,17 @@ function App({ user, onUserChange, onLogout }: AppProps) {
     <>
       <main className={`app-shell${videoSrc ? " has-media-bar" : ""}`}>
         <header className="app-header">
+          <button
+            className="tv-mode-btn"
+            onClick={onEnterTv}
+            title="Turn this screen into a TV player that phones can control"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="2" y="5" width="20" height="13" rx="2" />
+              <path d="M8 21h8M12 18v3" />
+            </svg>
+            TV mode
+          </button>
           <h1 className="app-title">Pentatonic Guitar Explorer</h1>
           <p className="app-subtitle">
             Visualize scales, analyze solos, and map fretboard patterns instantly

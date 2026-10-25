@@ -1,5 +1,7 @@
 fastapi
 uvicorn[standard]
+# WebSocket support for TV mode; named explicitly so a plain `uvicorn` install still has it
+websockets
 
 pydantic
 

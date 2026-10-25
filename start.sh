@@ -18,7 +18,8 @@ echo "Starting backend..."
 (
     cd backend
     source .venv/bin/activate
-    uvicorn app.main:app --reload
+    # 0.0.0.0 so phones joining TV mode can reach the API, not just this machine
+    uvicorn app.main:app --reload --host 0.0.0.0
 ) &
 BACKEND_PID=$!
 

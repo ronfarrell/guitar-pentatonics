@@ -12,6 +12,8 @@ Paste a YouTube link, get a live fretboard. The app downloads the audio, detects
 - Music-reactive visualizer — three styles (Orbit / Spectrum / Ribbon) drawn live from the audio, coloured by the chord under the playhead and pulsing on detected beats
 - Customizable fretboard colors (root, triads, scale notes)
 - Previously analyzed songs saved and replayable without re-downloading
+- Accounts — everyone gets their own library and playlists
+- **TV mode** — put the app on a TV and let everyone queue songs and run the show from their phones
 
 ---
 
@@ -89,6 +91,26 @@ Frontend runs at `http://localhost:5173`.
 ```
 
 Starts both services in the background. Press `Ctrl+C` to stop both.
+
+---
+
+## TV mode
+
+Turns a laptop plugged into a TV into the player, with phones as remotes.
+
+1. Sign in on the laptop and press **TV mode** (top right), then **Start session**.
+2. Everyone on the same Wi-Fi scans the QR code. They can sign in to queue songs from their own library, or join as a guest to control playback and the display.
+3. Anyone connected can play/pause, skip, seek, set the volume, reorder or remove queued songs, and switch the TV between music video and visualizer, show/hide the fretboard and chords, and change the scale.
+
+Reloading the TV page offers to resume the same session; **End session** (move the mouse to reveal it) disconnects everyone.
+
+**Phones need to reach the laptop.** With Docker or a normal install this just works. Under WSL2 (the Windows launcher), run this once from an Administrator PowerShell, then `wsl --shutdown` and start the app again:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File windows\enable-phone-access.ps1
+```
+
+It switches WSL to mirrored networking and opens port 8010 for Private networks. If the QR code ever shows the wrong address, use **Change** on the TV start screen to set it by hand. In dev, run Vite with `npm run dev -- --host` so phones can load the page.
 
 ---
 

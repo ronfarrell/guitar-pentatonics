@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { api, APIError } from "../services/api";
+import { api, APIError, mediaUrl } from "../services/api";
 import { registerMedia } from "../services/audioGraph";
 
 export const STEM_NAMES = ["vocals", "drums", "bass", "guitar", "piano", "other"] as const;
@@ -140,8 +140,7 @@ export function useStemPlayer(
   const guitarSplitAvailable = !!stems?.guitar_rhythm && !!stems?.guitar_lead;
   const error = failure && failure.url === loadedUrl ? failure.message : null;
 
-  const toSrc = (path: string) =>
-    `${import.meta.env.VITE_API_BASE_URL}/analysis/audio/${path}`;
+  const toSrc = (path: string) => mediaUrl("audio", path);
 
   // The set of audio tracks the engine should be playing right now
   const tracks = useMemo(() => {

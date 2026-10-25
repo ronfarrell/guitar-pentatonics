@@ -88,8 +88,37 @@ h3 {
 }
 
 .app-header {
+  position: relative;
   padding: 32px 0 4px;
   text-align: center;
+}
+
+.tv-mode-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tv-mode-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.tv-mode-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .app-title {
