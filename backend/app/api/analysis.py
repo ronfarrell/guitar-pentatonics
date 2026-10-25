@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi import HTTPException
 from pathlib import Path
@@ -13,7 +13,8 @@ from app.services.separation import (
     existing_stems,
     BETA_GUITAR_STEMS,
 )
-from app.services.storage import get_cached_analysis, set_instrumental_path
+from app.services.storage import get_cached_analysis, set_instrumental_path, add_to_library
+from app.api.deps import current_user
 from app.services.background import spawn
 import logging
 import uuid
@@ -53,7 +54,7 @@ async def test_endpoint(request: AnalysisRequest):
 
 
 @router.post("/start")
-async def start_analysis(request: AnalysisRequest) -> dict:
+async def start_analysis(request: AnalysisRequest, user: dict = Depends(current_user)) -> dict:
     """
     Start analysis and return a job ID for progress tracking
     
@@ -62,6 +63,7 @@ async def start_analysis(request: AnalysisRequest) -> dict:
     """
     job_id = str(uuid.uuid4())
     logger.info(f"Started analysis job {job_id} for: {request.youtube_url}")
+    add_to_library(user["id"], request.youtube_url)
     
     # Start the analysis in background
     spawn(process_youtube_video(request, job_id), f"analysis:{job_id}")
@@ -131,13 +133,14 @@ async def stream_analysis_progress(job_id: str):
 
 
 @router.post("")
-async def analyze_youtube(request: AnalysisRequest) -> AnalysisResult:
+async def analyze_youtube(request: AnalysisRequest, user: dict = Depends(current_user)) -> AnalysisResult:
     """
     Analyze a YouTube video for musical key and chords (blocking call)
     
     For long videos, consider using /start + /stream for progress updates
     """
     logger.info(f"Analysis request received for: {request.youtube_url}")
+    add_to_library(user["id"], request.youtube_url)
     
     try:
         result = await process_youtube_video(request)
@@ -161,7 +164,7 @@ async def analyze_youtube(request: AnalysisRequest) -> AnalysisResult:
 
 
 @router.post("/instrumental/start")
-async def start_instrumental(request: AnalysisRequest) -> dict:
+async def start_instrumental(request: AnalysisRequest, _user: dict = Depends(current_user)) -> dict:
     """
     Start vocal separation for an already-analyzed song.
 
@@ -196,7 +199,7 @@ async def start_instrumental(request: AnalysisRequest) -> dict:
 
 
 @router.post("/stems/start")
-async def start_stems(request: AnalysisRequest) -> dict:
+async def start_stems(request: AnalysisRequest, _user: dict = Depends(current_user)) -> dict:
     """
     Start a full 6-stem split (vocals/drums/bass/guitar/piano/other) for an
     already-analyzed song.
@@ -228,7 +231,7 @@ async def start_stems(request: AnalysisRequest) -> dict:
 
 
 @router.post("/guitar-split/start")
-async def start_guitar_split(request: AnalysisRequest) -> dict:
+async def start_guitar_split(request: AnalysisRequest, _user: dict = Depends(current_user)) -> dict:
     """
     Beta: split the guitar stem into rhythm/lead parts for an already-analyzed
     song. Ensures the 6-stem split exists first (running it if needed).

@@ -1,3 +1,5 @@
+import { authHeaders, notifyUnauthorized } from "./authToken";
+
 type ApiSong = {
   id: number;
   youtube_url: string;
@@ -16,9 +18,15 @@ export type SavedSong = {
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
+async function authedFetch(url: string, init?: RequestInit) {
+  const res = await fetch(url, { ...init, headers: { ...authHeaders(), ...init?.headers } });
+  if (res.status === 401) notifyUnauthorized();
+  return res;
+}
+
 export const savedSongsService = {
   async getAll(): Promise<SavedSong[]> {
-    const res = await fetch(`${API_BASE_URL}/songs`);
+    const res = await authedFetch(`${API_BASE_URL}/songs`);
 
     if (!res.ok) {
       throw new Error(`Failed to fetch songs: ${res.status}`);
@@ -38,7 +46,7 @@ export const savedSongsService = {
   },
 
   async delete(id: string): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/songs/${id}`, {
+    const res = await authedFetch(`${API_BASE_URL}/songs/${id}`, {
       method: "DELETE",
     });
 
@@ -48,7 +56,7 @@ export const savedSongsService = {
   },
 
   async reanalyze(id: string): Promise<{ job_id: string; youtube_url: string }> {
-    const res = await fetch(`${API_BASE_URL}/songs/${id}/reanalyze`, {
+    const res = await authedFetch(`${API_BASE_URL}/songs/${id}/reanalyze`, {
       method: "POST",
     });
 

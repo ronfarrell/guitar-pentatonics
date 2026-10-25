@@ -1,3 +1,5 @@
+import { authHeaders, notifyUnauthorized } from './authToken';
+
 // Environment configuration
 // Empty string = relative URLs, used in Docker where nginx proxies API routes to the backend.
 // Falls back to localhost:8000 for local dev without a .env.local file.
@@ -40,6 +42,18 @@ export type ApiPlaylist = {
   song_ids: number[];
 };
 
+export type ApiUser = {
+  id: number;
+  username: string;
+  display_name: string;
+  created_at: string | null;
+};
+
+export type AuthResponse = {
+  token: string;
+  user: ApiUser;
+};
+
 export type InstrumentalStartResponse = {
   status: 'completed' | 'processing';
   job_id?: string;
@@ -63,6 +77,28 @@ export class APIError extends Error {
   }
 }
 
+/** Pull FastAPI's `detail` out of an error body, falling back to something readable. */
+export function apiErrorMessage(err: unknown): string {
+  if (!(err instanceof APIError)) return 'Something went wrong.';
+  if (err.status === 0) return "Can't reach the server.";
+  try {
+    const detail = JSON.parse(err.message)?.detail;
+    if (typeof detail === 'string') return detail;
+    // 422 validation errors: a list of {loc, msg}
+    if (Array.isArray(detail) && detail[0]) {
+      const field = detail[0].loc?.at(-1);
+      if (field === 'username')
+        return 'Username must be 3–32 characters: letters, numbers, . _ -';
+      if (field === 'password' || field === 'new_password')
+        return 'Password must be at least 6 characters.';
+      return detail[0].msg ?? 'Invalid input.';
+    }
+  } catch {
+    // not JSON
+  }
+  return err.message;
+}
+
 // Generic fetch wrapper
 async function fetchAPI<T>(
   endpoint: string,
@@ -72,12 +108,19 @@ async function fetchAPI<T>(
 
   try {
     const response = await fetch(url, {
+      ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...authHeaders(),
         ...options?.headers,
       },
-      ...options,
     });
+
+    // A 401 from login/register is just a bad password; anywhere else it
+    // means the session is gone and the app should drop back to sign-in.
+    if (response.status === 401 && !endpoint.startsWith('/auth/login')) {
+      notifyUnauthorized();
+    }
 
     if (!response.ok) {
       const error = await response.text();
@@ -98,6 +141,30 @@ async function fetchAPI<T>(
 export const api = {
   health: {
     check: () => fetchAPI<HealthResponse>('/health/'),
+  },
+  auth: {
+    register: (username: string, password: string, displayName?: string) =>
+      fetchAPI<AuthResponse>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ username, password, display_name: displayName || null }),
+      }),
+    login: (username: string, password: string) =>
+      fetchAPI<AuthResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      }),
+    logout: () => fetchAPI<{ status: string }>('/auth/logout', { method: 'POST' }),
+    me: () => fetchAPI<ApiUser>('/auth/me'),
+    updateProfile: (displayName: string) =>
+      fetchAPI<ApiUser>('/auth/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ display_name: displayName }),
+      }),
+    changePassword: (currentPassword: string, newPassword: string) =>
+      fetchAPI<{ status: string }>('/auth/me/password', {
+        method: 'POST',
+        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+      }),
   },
   search: {
     youtube: (query: string, limit = 10, signal?: AbortSignal) =>

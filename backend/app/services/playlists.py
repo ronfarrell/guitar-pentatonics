@@ -4,6 +4,9 @@ Membership rows store `url_hash` rather than `analyses.id`. A reanalyze deletes
 the analyses row and reinserts it with a fresh autoincrement id, so an id-keyed
 playlist would quietly lose the song; url_hash survives that round trip. The API
 still speaks in song ids, so this module translates at the boundary.
+
+Every function takes the acting user's id; a playlist owned by someone else
+behaves exactly like one that doesn't exist.
 """
 import logging
 
@@ -12,10 +15,26 @@ from app.services.storage import _get_db_connection, init_db
 logger = logging.getLogger(__name__)
 
 
-def _hash_for_song_id(cursor, song_id: int) -> str | None:
-    cursor.execute("SELECT url_hash FROM analyses WHERE id = ?", (song_id,))
+def _hash_for_song_id(cursor, user_id: int, song_id: int) -> str | None:
+    """url_hash for a song in this user's library; None if absent or not theirs."""
+    cursor.execute(
+        """
+        SELECT a.url_hash
+        FROM analyses a
+        JOIN user_songs us ON us.url_hash = a.url_hash AND us.user_id = ?
+        WHERE a.id = ?
+        """,
+        (user_id, song_id),
+    )
     row = cursor.fetchone()
     return row[0] if row else None
+
+
+def _owns(cursor, user_id: int, playlist_id: int) -> bool:
+    cursor.execute(
+        "SELECT 1 FROM playlists WHERE id = ? AND user_id = ?", (playlist_id, user_id)
+    )
+    return cursor.fetchone() is not None
 
 
 def _song_ids_for(cursor, playlist_id: int) -> list[int]:
@@ -33,12 +52,15 @@ def _song_ids_for(cursor, playlist_id: int) -> list[int]:
     return [row[0] for row in cursor.fetchall()]
 
 
-def list_playlists() -> list[dict]:
+def list_playlists(user_id: int) -> list[dict]:
     init_db()
     conn = _get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, name, created_at FROM playlists ORDER BY position, id")
+    cursor.execute(
+        "SELECT id, name, created_at FROM playlists WHERE user_id = ? ORDER BY position, id",
+        (user_id,),
+    )
     rows = cursor.fetchall()
 
     playlists = [
@@ -55,12 +77,15 @@ def list_playlists() -> list[dict]:
     return playlists
 
 
-def get_playlist(playlist_id: int) -> dict | None:
+def get_playlist(user_id: int, playlist_id: int) -> dict | None:
     init_db()
     conn = _get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, name, created_at FROM playlists WHERE id = ?", (playlist_id,))
+    cursor.execute(
+        "SELECT id, name, created_at FROM playlists WHERE id = ? AND user_id = ?",
+        (playlist_id, user_id),
+    )
     row = cursor.fetchone()
 
     if not row:
@@ -78,17 +103,19 @@ def get_playlist(playlist_id: int) -> dict | None:
     return playlist
 
 
-def create_playlist(name: str) -> dict:
+def create_playlist(user_id: int, name: str) -> dict:
     init_db()
     conn = _get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COALESCE(MAX(position), -1) + 1 FROM playlists")
+    cursor.execute(
+        "SELECT COALESCE(MAX(position), -1) + 1 FROM playlists WHERE user_id = ?", (user_id,)
+    )
     position = cursor.fetchone()[0]
 
     cursor.execute(
-        "INSERT INTO playlists (name, position) VALUES (?, ?)",
-        (name, position),
+        "INSERT INTO playlists (name, position, user_id) VALUES (?, ?, ?)",
+        (name, position, user_id),
     )
     playlist_id = cursor.lastrowid
 
@@ -100,26 +127,30 @@ def create_playlist(name: str) -> dict:
     return {"id": playlist_id, "name": name, "created_at": created_at, "song_ids": []}
 
 
-def rename_playlist(playlist_id: int, name: str) -> bool:
+def rename_playlist(user_id: int, playlist_id: int, name: str) -> bool:
     init_db()
     conn = _get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("UPDATE playlists SET name = ? WHERE id = ?", (name, playlist_id))
+    cursor.execute(
+        "UPDATE playlists SET name = ? WHERE id = ? AND user_id = ?",
+        (name, playlist_id, user_id),
+    )
     changed = cursor.rowcount > 0
     conn.close()
 
     return changed
 
 
-def delete_playlist(playlist_id: int) -> bool:
+def delete_playlist(user_id: int, playlist_id: int) -> bool:
     init_db()
     conn = _get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM playlists WHERE id = ?", (playlist_id,))
+    cursor.execute("DELETE FROM playlists WHERE id = ? AND user_id = ?", (playlist_id, user_id))
     changed = cursor.rowcount > 0
-    cursor.execute("DELETE FROM playlist_songs WHERE playlist_id = ?", (playlist_id,))
+    if changed:
+        cursor.execute("DELETE FROM playlist_songs WHERE playlist_id = ?", (playlist_id,))
     conn.close()
 
     if changed:
@@ -127,31 +158,34 @@ def delete_playlist(playlist_id: int) -> bool:
     return changed
 
 
-def add_song(playlist_id: int, song_id: int, exclusive: bool = True) -> str:
+def add_song(user_id: int, playlist_id: int, song_id: int, exclusive: bool = True) -> str:
     """Append a song to a playlist.
 
     Returns "ok", "no_playlist", or "no_song". With `exclusive`, the song is
-    first pulled out of every other playlist, matching the folder-style
+    first pulled out of the user's other playlists, matching the folder-style
     behaviour the library UI has always had.
     """
     init_db()
     conn = _get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT 1 FROM playlists WHERE id = ?", (playlist_id,))
-    if not cursor.fetchone():
+    if not _owns(cursor, user_id, playlist_id):
         conn.close()
         return "no_playlist"
 
-    url_hash = _hash_for_song_id(cursor, song_id)
+    url_hash = _hash_for_song_id(cursor, user_id, song_id)
     if url_hash is None:
         conn.close()
         return "no_song"
 
     if exclusive:
         cursor.execute(
-            "DELETE FROM playlist_songs WHERE url_hash = ? AND playlist_id != ?",
-            (url_hash, playlist_id),
+            """
+            DELETE FROM playlist_songs
+            WHERE url_hash = ? AND playlist_id != ?
+              AND playlist_id IN (SELECT id FROM playlists WHERE user_id = ?)
+            """,
+            (url_hash, playlist_id, user_id),
         )
 
     cursor.execute(
@@ -173,55 +207,64 @@ def add_song(playlist_id: int, song_id: int, exclusive: bool = True) -> str:
     return "ok"
 
 
-def remove_song(playlist_id: int, song_id: int) -> str:
+def remove_song(user_id: int, playlist_id: int, song_id: int) -> str:
     init_db()
     conn = _get_db_connection()
     cursor = conn.cursor()
 
-    url_hash = _hash_for_song_id(cursor, song_id)
+    url_hash = _hash_for_song_id(cursor, user_id, song_id)
     if url_hash is None:
         conn.close()
         return "no_song"
 
     cursor.execute(
-        "DELETE FROM playlist_songs WHERE playlist_id = ? AND url_hash = ?",
-        (playlist_id, url_hash),
+        """
+        DELETE FROM playlist_songs
+        WHERE playlist_id = ? AND url_hash = ?
+          AND playlist_id IN (SELECT id FROM playlists WHERE user_id = ?)
+        """,
+        (playlist_id, url_hash, user_id),
     )
     conn.close()
 
     return "ok"
 
 
-def remove_song_everywhere(song_id: int) -> str:
-    """Pull a song out of every playlist (the 'drag back to All Songs' action)."""
+def remove_song_everywhere(user_id: int, song_id: int) -> str:
+    """Pull a song out of all the user's playlists (the 'drag back to All Songs' action)."""
     init_db()
     conn = _get_db_connection()
     cursor = conn.cursor()
 
-    url_hash = _hash_for_song_id(cursor, song_id)
+    url_hash = _hash_for_song_id(cursor, user_id, song_id)
     if url_hash is None:
         conn.close()
         return "no_song"
 
-    cursor.execute("DELETE FROM playlist_songs WHERE url_hash = ?", (url_hash,))
+    cursor.execute(
+        """
+        DELETE FROM playlist_songs
+        WHERE url_hash = ? AND playlist_id IN (SELECT id FROM playlists WHERE user_id = ?)
+        """,
+        (url_hash, user_id),
+    )
     conn.close()
 
     return "ok"
 
 
-def reorder_songs(playlist_id: int, song_ids: list[int]) -> str:
+def reorder_songs(user_id: int, playlist_id: int, song_ids: list[int]) -> str:
     """Rewrite a playlist's ordering. Ids not already in the playlist are ignored."""
     init_db()
     conn = _get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT 1 FROM playlists WHERE id = ?", (playlist_id,))
-    if not cursor.fetchone():
+    if not _owns(cursor, user_id, playlist_id):
         conn.close()
         return "no_playlist"
 
     for position, song_id in enumerate(song_ids):
-        url_hash = _hash_for_song_id(cursor, song_id)
+        url_hash = _hash_for_song_id(cursor, user_id, song_id)
         if url_hash is None:
             continue
         cursor.execute(

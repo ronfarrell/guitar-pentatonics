@@ -73,6 +73,45 @@ def init_db():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL COLLATE NOCASE,
+            display_name TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Only a sha256 of each token is stored, so a leaked DB can't be replayed
+    # as live sessions.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            token_hash TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NOT NULL
+        )
+    """)
+
+    # Per-user library. analyses is a shared cache (one download/analysis per
+    # URL no matter how many people want it); this decides who sees what.
+    # Keyed by url_hash for the same reanalyze reason as playlist_songs.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_songs (
+            user_id INTEGER NOT NULL,
+            url_hash TEXT NOT NULL,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, url_hash)
+        )
+    """)
+
+    # Playlists predate users; rows left NULL are claimed by the first account.
+    cursor.execute("PRAGMA table_info(playlists)")
+    if "user_id" not in [col[1] for col in cursor.fetchall()]:
+        logger.info("[DB] Adding user_id column to playlists...")
+        cursor.execute("ALTER TABLE playlists ADD COLUMN user_id INTEGER")
+
     conn.close()
     logger.info("[DB] Database ready")
 
@@ -230,27 +269,85 @@ def get_analysis(record_id: int) -> AnalysisResult | None:
     return AnalysisResult(key=key, chords=chords, audio_path=audio_path, video_path=video_path)
 
 
-def delete_analysis_by_id(song_id: int) -> tuple[str | None, str | None]:
-    """Delete a song from DB and return (audio_path, video_path) for file cleanup."""
+def add_to_library(user_id: int, youtube_url: str) -> None:
+    """Put a URL in a user's library. Safe to call before the analysis exists:
+    listings join on analyses, so a link whose analysis failed stays invisible."""
+    init_db()
+    conn = _get_db_connection()
+    conn.execute(
+        "INSERT OR IGNORE INTO user_songs (user_id, url_hash) VALUES (?, ?)",
+        (user_id, get_url_hash(youtube_url)),
+    )
+    conn.close()
+
+
+def in_library(user_id: int, song_id: int) -> bool:
+    init_db()
+    conn = _get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT 1 FROM analyses a
+        JOIN user_songs us ON us.url_hash = a.url_hash AND us.user_id = ?
+        WHERE a.id = ?
+        """,
+        (user_id, song_id),
+    )
+    found = cursor.fetchone() is not None
+    conn.close()
+    return found
+
+
+def remove_from_library(user_id: int, song_id: int) -> tuple[bool, str | None, str | None]:
+    """Drop a song from one user's library and playlists.
+
+    Returns (found, audio_path, video_path). The paths are only set when no
+    other user still has the song — then the shared analysis row is deleted
+    too and the caller should remove the files. Otherwise they're None and
+    the cache stays for everyone else.
+    """
     init_db()
     conn = _get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT audio_path, video_path, url_hash FROM analyses WHERE id = ?", (song_id,))
+    cursor.execute(
+        """
+        SELECT a.audio_path, a.video_path, a.url_hash
+        FROM analyses a
+        JOIN user_songs us ON us.url_hash = a.url_hash AND us.user_id = ?
+        WHERE a.id = ?
+        """,
+        (user_id, song_id),
+    )
     row = cursor.fetchone()
 
     if not row:
         conn.close()
-        return None, None
+        return False, None, None
 
     audio_path, video_path, url_hash = row
-    cursor.execute("DELETE FROM analyses WHERE id = ?", (song_id,))
-    # Deleting a song is permanent, so drop it from any playlist holding it.
+    cursor.execute(
+        "DELETE FROM user_songs WHERE user_id = ? AND url_hash = ?", (user_id, url_hash)
+    )
+    # Deleting a song is permanent, so drop it from any of the user's playlists.
     # (Reanalyze deliberately does not do this — see clear_cache_for_reanalyze.)
-    cursor.execute("DELETE FROM playlist_songs WHERE url_hash = ?", (url_hash,))
+    cursor.execute(
+        """
+        DELETE FROM playlist_songs
+        WHERE url_hash = ? AND playlist_id IN (SELECT id FROM playlists WHERE user_id = ?)
+        """,
+        (url_hash, user_id),
+    )
+
+    cursor.execute("SELECT 1 FROM user_songs WHERE url_hash = ? LIMIT 1", (url_hash,))
+    if cursor.fetchone():
+        conn.close()
+        return True, None, None
+
+    cursor.execute("DELETE FROM analyses WHERE id = ?", (song_id,))
     conn.close()
 
-    return audio_path, video_path
+    return True, audio_path, video_path
 
 
 def clear_cache_for_reanalyze(song_id: int) -> tuple[str | None, str | None]:
@@ -277,15 +374,25 @@ def clear_cache_for_reanalyze(song_id: int) -> tuple[str | None, str | None]:
     return youtube_url, video_title
 
 
-def list_all_analyses(limit: int = 100):
-    """List all analysis results from the database"""
+def list_library(user_id: int, limit: int = 100):
+    """List the analyses in one user's library"""
     init_db()
-    
+
     conn = _get_db_connection()
     cursor = conn.cursor()
-    
-    cursor.execute("SELECT id, youtube_url, url_hash, key, video_title FROM analyses LIMIT ?", (limit,))
+
+    cursor.execute(
+        """
+        SELECT a.id, a.youtube_url, a.url_hash, a.key, a.video_title
+        FROM analyses a
+        JOIN user_songs us ON us.url_hash = a.url_hash
+        WHERE us.user_id = ?
+        ORDER BY us.added_at, a.id
+        LIMIT ?
+        """,
+        (user_id, limit),
+    )
     rows = cursor.fetchall()
     conn.close()
-    
+
     return rows

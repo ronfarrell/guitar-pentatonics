@@ -2399,6 +2399,187 @@ select:disabled {
 }
 
 /* =========================
+   SIGN IN & ACCOUNT
+========================= */
+
+.auth-page {
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  padding: 28px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-title {
+  font-size: 1.5rem;
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.auth-card .settings-hint {
+  text-align: center;
+  margin: -6px 0 2px;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface-strong);
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-tab--active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.auth-field em {
+  font-weight: 400;
+  font-style: normal;
+  opacity: 0.8;
+}
+
+.auth-input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-border);
+}
+
+.auth-error,
+.auth-notice,
+.account-ok {
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.auth-error {
+  color: #e5484d;
+  background: rgba(229, 72, 77, 0.08);
+}
+
+.auth-notice {
+  color: var(--muted);
+  background: var(--surface-strong);
+}
+
+.account-ok {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.auth-submit {
+  padding: 10px 22px;
+  margin-top: 4px;
+}
+
+.account-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.account-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.account-who {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-who h3,
+.account-who .settings-hint {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.account-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.account-row {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .account-row {
+    flex-wrap: wrap;
+  }
+}
+
+/* =========================
    FRETBOARD
 ========================= */
 

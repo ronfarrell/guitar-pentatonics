@@ -5,11 +5,16 @@ import {
   type ThemeMode,
   type ThemeSettings,
 } from "../theme/themeSettings";
+import type { ApiUser } from "../services/api";
+import AccountSection from "./AccountSection";
 
 type Props = {
   saved: ThemeSettings;
   onSave: (settings: ThemeSettings) => void;
   onClose: () => void;
+  user: ApiUser;
+  onUserChange: (user: ApiUser) => void;
+  onLogout: () => void;
 };
 
 const MODE_PREVIEWS: Record<ThemeMode, { page: string; surface: string; text: string }> = {
@@ -17,7 +22,7 @@ const MODE_PREVIEWS: Record<ThemeMode, { page: string; surface: string; text: st
   dark: { page: "#0c0d13", surface: "#13141e", text: "#e2e4f0" },
 };
 
-export default function SettingsPage({ saved, onSave, onClose }: Props) {
+export default function SettingsPage({ saved, onSave, onClose, user, onUserChange, onLogout }: Props) {
   const [draft, setDraft] = useState<ThemeSettings>(saved);
 
   // Live-preview the draft; cancel restores the saved settings
@@ -57,6 +62,8 @@ export default function SettingsPage({ saved, onSave, onClose }: Props) {
           </button>
           <h2>Settings</h2>
         </header>
+
+        <AccountSection user={user} onUserChange={onUserChange} onLogout={onLogout} />
 
         <section className="settings-section">
           <h3>Appearance</h3>

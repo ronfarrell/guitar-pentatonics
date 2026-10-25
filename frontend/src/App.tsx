@@ -42,6 +42,7 @@ import type { PlaybackSession } from "./services/sessionStore";
 import SettingsPage from "./components/SettingsPage";
 import { loadThemeSettings, saveThemeSettings, applyThemeSettings } from "./theme/themeSettings";
 import type { ThemeSettings } from "./theme/themeSettings";
+import type { ApiUser } from "./services/api";
 
 function extractRoot(chord: string | null): NoteName | null {
   return chord?.match(/^[A-G](#|b)?/)?.[0] as NoteName | null;
@@ -72,7 +73,13 @@ function loadVisualizerPref(): VisualizerPref {
   }
 }
 
-function App() {
+type AppProps = {
+  user: ApiUser;
+  onUserChange: (user: ApiUser) => void;
+  onLogout: () => void;
+};
+
+function App({ user, onUserChange, onLogout }: AppProps) {
   const [root, setRoot] = useState<NoteName>(ROOT_NOTES[0]);
   const [scaleType, setScaleType] = useState<ScaleType>("Major Pentatonic");
   const [youtubeUrl, setYoutubeUrl] = useState("");
@@ -612,6 +619,9 @@ function App() {
             setThemeSettings(s);
           }}
           onClose={() => setSettingsOpen(false)}
+          user={user}
+          onUserChange={onUserChange}
+          onLogout={onLogout}
         />
       )}
     </>

@@ -2,8 +2,9 @@ import asyncio
 import uuid
 import shutil
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
-from app.services.storage import list_all_analyses, delete_analysis_by_id, clear_cache_for_reanalyze
+from fastapi import APIRouter, Depends, HTTPException
+from app.api.deps import current_user
+from app.services.storage import list_library, remove_from_library, in_library, clear_cache_for_reanalyze
 from app.services.analysis import process_youtube_video
 from app.services.background import spawn
 from app.models.analysis import AnalysisRequest
@@ -27,8 +28,8 @@ def dummy_saved_songs():
 
 
 @router.get("")
-def list_cached_songs():
-    rows = list_all_analyses()
+def list_cached_songs(user: dict = Depends(current_user)):
+    rows = list_library(user["id"])
 
     return {
         "songs": [
@@ -45,11 +46,11 @@ def list_cached_songs():
 
 
 @router.delete("/{song_id}")
-def delete_song(song_id: int):
-    """Delete a song from the database and remove its audio/video files."""
-    audio_path, video_path = delete_analysis_by_id(song_id)
+def delete_song(song_id: int, user: dict = Depends(current_user)):
+    """Remove a song from the user's library; if nobody else has it, delete its files too."""
+    found, audio_path, video_path = remove_from_library(user["id"], song_id)
 
-    if audio_path is None and video_path is None:
+    if not found:
         raise HTTPException(status_code=404, detail="Song not found")
 
     for path_str in [audio_path, video_path]:
@@ -63,7 +64,7 @@ def delete_song(song_id: int):
 
 
 @router.post("/{song_id}/reanalyze")
-async def reanalyze_song(song_id: int):
+async def reanalyze_song(song_id: int, user: dict = Depends(current_user)):
     """
     Re-run chord/key detection for a song.
 
@@ -71,6 +72,9 @@ async def reanalyze_song(song_id: int):
     vocals-stripped instrumental (separated first if needed) since vocal
     melody interferes with chord recognition — this is the accuracy pass.
     """
+    if not in_library(user["id"], song_id):
+        raise HTTPException(status_code=404, detail="Song not found")
+
     youtube_url, video_title = clear_cache_for_reanalyze(song_id)
 
     if not youtube_url:
