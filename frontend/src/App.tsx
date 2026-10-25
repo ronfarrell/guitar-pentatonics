@@ -49,6 +49,10 @@ function extractRoot(chord: string | null): NoteName | null {
 
 const VIZ_STORAGE_KEY = "visualizer";
 
+// Shuffling the library plays it as a context, so it needs a playlist to be.
+// The id is a sentinel: real playlists carry their backend row id.
+const LIBRARY_PLAYLIST = { id: "__library__", name: "Library" };
+
 type VisualizerPref = {
   on: boolean;
   mode: VisualizerMode;
@@ -122,6 +126,10 @@ function App() {
     repeat: mediaControls.repeat,
     onLoadSong: handleLoadSong,
   });
+
+  // What's actually on the player right now, by library id.
+  const nowPlayingSongId =
+    savedSongs.find((s) => s.youtubeUrl === loadedUrl)?.id ?? null;
 
   // Restore the last session (song + position) once on mount
   const resumeRef = useRef<PlaybackSession | null>(null);
@@ -334,14 +342,23 @@ function App() {
               playback.playPlaylist(playlist, startSongId);
               setMenuOpen(false);
             }}
+            onShufflePlaylist={(playlist) => {
+              playback.playPlaylistShuffled(playlist);
+              setMenuOpen(false);
+            }}
+            onShuffleLibrary={() => {
+              playback.playPlaylistShuffled(
+                { ...LIBRARY_PLAYLIST, songIds: savedSongs.map((s) => s.id) },
+                nowPlayingSongId ?? undefined,
+              );
+              setMenuOpen(false);
+            }}
             onEnqueueSong={playback.enqueue}
             onEnqueuePlaylist={(playlist) =>
               playlist.songIds.forEach((id) => playback.enqueue(id))
             }
             nowPlayingPlaylistId={playback.nowPlaying?.playlistId ?? null}
-            nowPlayingSongId={
-              savedSongs.find((s) => s.youtubeUrl === loadedUrl)?.id ?? null
-            }
+            nowPlayingSongId={nowPlayingSongId}
             onDeleteSong={deleteSong}
             onReanalyzeSong={async (song) => {
               const result = await startReanalyze(song);

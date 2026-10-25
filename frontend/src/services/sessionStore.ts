@@ -75,18 +75,27 @@ export function saveVolume(level: number) {
 export type QueueSession = {
   context: PlaybackContext | null;
   queue: QueueEntry[];
+  shuffle: boolean;
 };
 
-function isContext(value: unknown): value is PlaybackContext {
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((id) => typeof id === "string");
+
+function parseContext(value: unknown): PlaybackContext | null {
   const c = value as PlaybackContext | null;
-  return (
-    !!c &&
-    typeof c.playlistId === "string" &&
-    typeof c.playlistName === "string" &&
-    Array.isArray(c.songIds) &&
-    c.songIds.every((id) => typeof id === "string") &&
-    typeof c.index === "number"
-  );
+  if (
+    !c ||
+    typeof c.playlistId !== "string" ||
+    typeof c.playlistName !== "string" ||
+    !isStringArray(c.songIds) ||
+    typeof c.index !== "number"
+  )
+    return null;
+
+  // shuffleOrder arrived after shuffle did: sessions written before it are
+  // still perfectly good playlists, so restore them in playlist order rather
+  // than throwing the context away.
+  return { ...c, shuffleOrder: isStringArray(c.shuffleOrder) ? c.shuffleOrder : null };
 }
 
 export function loadQueueSession(): QueueSession | null {
@@ -100,7 +109,11 @@ export function loadQueueSession(): QueueSession | null {
             typeof e?.uid === "string" && typeof e?.songId === "string",
         )
       : [];
-    return { context: isContext(parsed?.context) ? parsed.context : null, queue };
+    return {
+      context: parseContext(parsed?.context),
+      queue,
+      shuffle: parsed?.shuffle === true,
+    };
   } catch {
     return null;
   }

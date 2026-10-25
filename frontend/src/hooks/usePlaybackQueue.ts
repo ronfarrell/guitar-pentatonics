@@ -16,9 +16,16 @@ import { loadQueueSession, saveQueueSession } from "../services/sessionStore";
 export type PlaybackContext = {
   playlistId: string;
   playlistName: string;
+  /** The playlist's own order — the thing shuffle is a permutation of. */
   songIds: string[];
+  /** The shuffled run while shuffle is on; null when playing in playlist order. */
+  shuffleOrder: string[] | null;
+  /** Cursor into the effective order, i.e. `shuffleOrder ?? songIds`. */
   index: number;
 };
+
+/** A context resolved against the library, with its effective play order. */
+export type LiveContext = PlaybackContext & { order: string[] };
 
 /** A queued entry; `uid` keeps duplicates of the same song addressable. */
 export type QueueEntry = {
@@ -43,6 +50,38 @@ type Options = {
 const nextUid = () =>
   `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
+/**
+ * Fisher-Yates on a copy: the playlist's own order is a saved thing, so a
+ * shuffled run only ever reorders the context's snapshot of it.
+ */
+const shuffled = <T,>(items: T[]): T[] => {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+};
+
+/** A shuffled run with `first` pinned to the front, when one is given. */
+const shuffledFrom = (songIds: string[], first?: string) =>
+  first && songIds.includes(first)
+    ? [first, ...shuffled(songIds.filter((id) => id !== first))]
+    : shuffled(songIds);
+
+/** Drop the derived `order` before the context goes back into state. */
+const storable = (
+  c: LiveContext,
+  patch: Partial<PlaybackContext> = {},
+): PlaybackContext => ({
+  playlistId: c.playlistId,
+  playlistName: c.playlistName,
+  songIds: c.songIds,
+  shuffleOrder: c.shuffleOrder,
+  index: c.index,
+  ...patch,
+});
+
 export function usePlaybackQueue({
   songs,
   videoRef,
@@ -60,6 +99,9 @@ export function usePlaybackQueue({
     restored?.context ?? null,
   );
   const [userQueue, setUserQueue] = useState<QueueEntry[]>(restored?.queue ?? []);
+  // Sticky: it outlives the playlist it was turned on for, so the next one you
+  // start comes up shuffled too, the way the transport toggle implies.
+  const [shuffle, setShuffle] = useState(restored?.shuffle ?? false);
   // Set when a queued song is what's currently playing, so the UI can say so
   // without the context cursor having moved.
   const [playingFromQueue, setPlayingFromQueue] = useState(false);
@@ -73,13 +115,16 @@ export function usePlaybackQueue({
 
   // Songs can be deleted while queued; treat the library as the source of
   // truth and derive the live view rather than storing pruned copies.
-  const liveContext = useMemo(() => {
+  const liveContext = useMemo((): LiveContext | null => {
     if (!context) return null;
-    const songIds = context.songIds.filter((id) => songs.some((s) => s.id === id));
-    if (songIds.length === 0) return null;
-    const currentId = context.songIds[context.index];
-    const index = songIds.indexOf(currentId);
-    return { ...context, songIds, index: index === -1 ? 0 : index };
+    const inLibrary = (id: string) => songs.some((s) => s.id === id);
+    const songIds = context.songIds.filter(inLibrary);
+    const shuffleOrder = context.shuffleOrder?.filter(inLibrary) ?? null;
+    const order = shuffleOrder ?? songIds;
+    if (order.length === 0) return null;
+    const currentId = (context.shuffleOrder ?? context.songIds)[context.index];
+    const index = order.indexOf(currentId);
+    return { ...context, songIds, shuffleOrder, order, index: index === -1 ? 0 : index };
   }, [context, songs]);
 
   const liveQueue = useMemo(
@@ -98,6 +143,18 @@ export function usePlaybackQueue({
     [liveQueue, songs],
   );
 
+  /** What the playlist plays after the current song, in the order it will. */
+  const contextUpNext = useMemo(() => {
+    if (!liveContext) return [];
+    return liveContext.order
+      .slice(liveContext.index + 1)
+      .map((songId) => {
+        const song = songs.find((s) => s.id === songId);
+        return song ? { songId, song } : null;
+      })
+      .filter(Boolean) as { songId: string; song: SavedSong }[];
+  }, [liveContext, songs]);
+
   const loadSong = useCallback(
     (song: SavedSong) => {
       if (!song.youtubeUrl) return false;
@@ -115,27 +172,122 @@ export function usePlaybackQueue({
     [songs],
   );
 
-  /** Start a playlist, optionally at a specific song. */
-  const playPlaylist = useCallback(
-    (playlist: Playlist, startSongId?: string) => {
-      const songIds = playlist.songIds.filter((id) => songs.some((s) => s.id === id));
-      if (songIds.length === 0) return;
+  /** The playlist's songs that still exist in the library, in playlist order. */
+  const playableSongIds = useCallback(
+    (playlist: Playlist) =>
+      playlist.songIds.filter((id) => songs.some((s) => s.id === id)),
+    [songs],
+  );
 
-      const at = startSongId ? songIds.indexOf(startSongId) : 0;
-      const index = at === -1 ? 0 : at;
-      const song = findSong(songIds[index]);
+  const startContext = useCallback(
+    (
+      playlist: Playlist,
+      songIds: string[],
+      shuffleOrder: string[] | null,
+      index: number,
+    ) => {
+      const song = findSong((shuffleOrder ?? songIds)[index]);
       if (!song) return;
 
       setContext({
         playlistId: playlist.id,
         playlistName: playlist.name,
         songIds,
+        shuffleOrder,
         index,
       });
       setPlayingFromQueue(false);
       loadSong(song);
     },
-    [songs, findSong, loadSong],
+    [findSong, loadSong],
+  );
+
+  /**
+   * Start a playlist, optionally at a specific song. With shuffle on the run
+   * is shuffled up front rather than picked track by track, so next/prev step
+   * through one stable order and a refresh resumes that same run instead of
+   * reshuffling underneath the listener.
+   */
+  const playPlaylist = useCallback(
+    (playlist: Playlist, startSongId?: string) => {
+      const songIds = playableSongIds(playlist);
+      if (songIds.length === 0) return;
+
+      if (shuffle) {
+        // Shuffling still honours the song you clicked: it leads, the rest
+        // follow shuffled behind it.
+        startContext(playlist, songIds, shuffledFrom(songIds, startSongId), 0);
+        return;
+      }
+
+      const at = startSongId ? songIds.indexOf(startSongId) : 0;
+      startContext(playlist, songIds, null, at === -1 ? 0 : at);
+    },
+    [playableSongIds, shuffle, startContext],
+  );
+
+  /**
+   * Shuffle-play a playlist, turning shuffle on for whatever follows. Pass
+   * `avoidSongId` to keep the run from opening on a song that's already
+   * playing — the rest of the shuffle is untouched, so every other song is
+   * still equally likely to lead.
+   */
+  const playPlaylistShuffled = useCallback(
+    (playlist: Playlist, avoidSongId?: string) => {
+      const songIds = playableSongIds(playlist);
+      if (songIds.length === 0) return;
+
+      const order = shuffled(songIds);
+      if (order.length > 1 && order[0] === avoidSongId) {
+        const swap = 1 + Math.floor(Math.random() * (order.length - 1));
+        [order[0], order[swap]] = [order[swap], order[0]];
+      }
+
+      setShuffle(true);
+      startContext(playlist, songIds, order, 0);
+    },
+    [playableSongIds, startContext],
+  );
+
+  /**
+   * Flip shuffle for the current run and everything started after it. What's
+   * playing keeps playing — only the songs still ahead are reordered — so the
+   * toggle never sounds like a skip.
+   */
+  const toggleShuffle = useCallback(() => {
+    const next = !shuffle;
+    setShuffle(next);
+    if (!liveContext) return;
+
+    const current = liveContext.order[liveContext.index];
+    if (next) {
+      setContext(
+        storable(liveContext, {
+          shuffleOrder: [current, ...shuffled(liveContext.songIds.filter((id) => id !== current))],
+          index: 0,
+        }),
+      );
+    } else {
+      // Back to playlist order, picking up from where this song sits in it.
+      const at = liveContext.songIds.indexOf(current);
+      setContext(storable(liveContext, { shuffleOrder: null, index: at === -1 ? 0 : at }));
+    }
+  }, [shuffle, liveContext]);
+
+  /** Jump straight to a song further along the current playlist run. */
+  const playContextSong = useCallback(
+    (songId: string) => {
+      if (!liveContext) return false;
+      const index = liveContext.order.indexOf(songId);
+      if (index === -1) return false;
+      const song = findSong(songId);
+      if (!song) return false;
+
+      setContext(storable(liveContext, { index }));
+      setPlayingFromQueue(false);
+      return loadSong(song);
+    },
+    [liveContext, findSong, loadSong],
   );
 
   /** Play a single song now, dropping any playlist context but keeping the queue. */
@@ -168,7 +320,9 @@ export function usePlaybackQueue({
 
   const clearQueue = useCallback(() => setUserQueue([]), []);
 
-  const hasNext = liveQueue.length > 0 || (!!liveContext && liveContext.index < liveContext.songIds.length - 1);
+  const hasNext =
+    liveQueue.length > 0 ||
+    (!!liveContext && liveContext.index < liveContext.order.length - 1);
   const hasPrev = !!liveContext && liveContext.index > 0;
 
   const playNext = useCallback(() => {
@@ -183,13 +337,13 @@ export function usePlaybackQueue({
       }
     }
 
-    if (!liveContext || liveContext.index >= liveContext.songIds.length - 1) return false;
+    if (!liveContext || liveContext.index >= liveContext.order.length - 1) return false;
 
     const index = liveContext.index + 1;
-    const song = findSong(liveContext.songIds[index]);
+    const song = findSong(liveContext.order[index]);
     if (!song) return false;
 
-    setContext({ ...liveContext, index });
+    setContext(storable(liveContext, { index }));
     setPlayingFromQueue(false);
     return loadSong(song);
   }, [liveQueue, liveContext, findSong, loadSong]);
@@ -198,10 +352,10 @@ export function usePlaybackQueue({
     if (!liveContext || liveContext.index <= 0) return false;
 
     const index = liveContext.index - 1;
-    const song = findSong(liveContext.songIds[index]);
+    const song = findSong(liveContext.order[index]);
     if (!song) return false;
 
-    setContext({ ...liveContext, index });
+    setContext(storable(liveContext, { index }));
     setPlayingFromQueue(false);
     return loadSong(song);
   }, [liveContext, findSong, loadSong]);
@@ -215,8 +369,8 @@ export function usePlaybackQueue({
   // asynchronously, so on the first render everything looks deleted and
   // saving the live view would wipe the queue we just restored.
   useEffect(() => {
-    saveQueueSession({ context, queue: userQueue });
-  }, [context, userQueue]);
+    saveQueueSession({ context, queue: userQueue, shuffle });
+  }, [context, userQueue, shuffle]);
 
   // Advance when the current track finishes.
   useEffect(() => {
@@ -260,8 +414,8 @@ export function usePlaybackQueue({
         playlistId: liveContext.playlistId,
         name: liveContext.playlistName,
         position: liveContext.index + 1,
-        total: liveContext.songIds.length,
-        songId: playingFromQueue ? null : liveContext.songIds[liveContext.index],
+        total: liveContext.order.length,
+        songId: playingFromQueue ? null : liveContext.order[liveContext.index],
       }
     : null;
 
@@ -270,10 +424,15 @@ export function usePlaybackQueue({
     nowPlaying,
     playingFromQueue,
     upNext,
+    contextUpNext,
     queueLength: liveQueue.length,
+    shuffle,
     hasNext,
     hasPrev,
     playPlaylist,
+    playPlaylistShuffled,
+    toggleShuffle,
+    playContextSong,
     playSong,
     playNext,
     playPrev,

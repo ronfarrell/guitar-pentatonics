@@ -90,6 +90,8 @@ type Props = {
   onDeleteSong?: (id: string) => void;
   onReanalyzeSong?: (song: SavedSong) => void;
   onPlayPlaylist?: (playlist: Playlist, startSongId?: string) => void;
+  onShufflePlaylist?: (playlist: Playlist) => void;
+  onShuffleLibrary?: () => void;
   onEnqueueSong?: (songId: string) => void;
   onEnqueuePlaylist?: (playlist: Playlist) => void;
   reanalyzingId?: string | null;
@@ -104,6 +106,8 @@ function SavedSongs({
   onDeleteSong,
   onReanalyzeSong,
   onPlayPlaylist,
+  onShufflePlaylist,
+  onShuffleLibrary,
   onEnqueueSong,
   onEnqueuePlaylist,
   reanalyzingId,
@@ -199,12 +203,11 @@ function SavedSongs({
     onDeleteSong?.(id);
   }
 
-  function handleRandomSong() {
-    // Never re-pick what's already playing, unless it's the only song there is.
-    const pool = songs.filter((s) => s.id !== nowPlayingSongId);
-    const candidates = pool.length > 0 ? pool : songs;
-    if (candidates.length === 0) return;
-    onSelectSong?.(candidates[Math.floor(Math.random() * candidates.length)]);
+  // Shuffles the whole library into a run you can play through, rather than
+  // dropping in one random song and falling silent after it.
+  function handleShuffleLibrary() {
+    if (songs.length === 0) return;
+    onShuffleLibrary?.();
   }
 
   return (
@@ -215,12 +218,16 @@ function SavedSongs({
           <div className="saved-songs-header-actions">
             <button
               className="new-playlist-btn"
-              onClick={handleRandomSong}
+              onClick={handleShuffleLibrary}
               disabled={songs.length === 0}
-              title={songs.length === 0 ? "No saved songs yet" : "Play a random song"}
-              aria-label="Play a random song"
+              title={
+                songs.length === 0
+                  ? "No saved songs yet"
+                  : "Shuffle your whole library"
+              }
+              aria-label="Shuffle the whole library"
             >
-              🎲 Random
+              🔀 Shuffle
             </button>
             <button
               className="new-playlist-btn"
@@ -293,6 +300,26 @@ function SavedSongs({
                     aria-label={`Play ${playlist.name}`}
                   >
                     ▶
+                  </button>
+
+                  <button
+                    className="playlist-shuffle-btn"
+                    onClick={() => onShufflePlaylist?.(playlist)}
+                    disabled={playlistSongs.length === 0}
+                    title={
+                      playlistSongs.length === 0
+                        ? "Playlist is empty"
+                        : `Shuffle "${playlist.name}"`
+                    }
+                    aria-label={`Shuffle ${playlist.name}`}
+                  >
+                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="16 3 21 3 21 8" />
+                      <line x1="4" y1="20" x2="21" y2="3" />
+                      <polyline points="21 16 21 21 16 21" />
+                      <line x1="15" y1="15" x2="21" y2="21" />
+                      <line x1="4" y1="4" x2="9" y2="9" />
+                    </svg>
                   </button>
 
                   <button

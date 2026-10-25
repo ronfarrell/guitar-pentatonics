@@ -101,6 +101,28 @@ export default function MediaBar({
         </svg>
       </button>
 
+      {queue && (
+        <button
+          className={`media-icon-btn${queue.shuffle ? " media-icon-btn--active" : ""}`}
+          onClick={queue.toggleShuffle}
+          aria-label={queue.shuffle ? "Shuffle on" : "Shuffle off"}
+          aria-pressed={queue.shuffle}
+          title={
+            queue.shuffle
+              ? "Shuffle: On — playlists start shuffled"
+              : "Shuffle: Off"
+          }
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="16 3 21 3 21 8" />
+            <line x1="4" y1="20" x2="21" y2="3" />
+            <polyline points="21 16 21 21 16 21" />
+            <line x1="15" y1="15" x2="21" y2="21" />
+            <line x1="4" y1="4" x2="9" y2="9" />
+          </svg>
+        </button>
+      )}
+
       <button
         className={`media-icon-btn${stemPlayer.vocalsOff ? " media-icon-btn--active" : ""}`}
         onClick={stemPlayer.toggleVocals}
@@ -289,29 +311,61 @@ export default function MediaBar({
                   </div>
                 )}
 
-                {queue.upNext.length === 0 ? (
+                {queue.upNext.length === 0 && queue.contextUpNext.length === 0 && (
                   <p className="queue-panel-hint">
-                    Nothing queued. Use ＋ on a song in your library to line it up.
+                    {queue.nowPlaying
+                      ? "Last song in the playlist. Use ＋ on a song in your library to line up another."
+                      : "Nothing queued. Use ＋ on a song in your library to line it up."}
                   </p>
-                ) : (
-                  <ul className="queue-list">
-                    {queue.upNext.map((entry, i) => (
-                      <li key={entry.uid} className="queue-row">
-                        <span className="queue-row-num">{i + 1}</span>
-                        <span className="queue-row-title" title={entry.song.title}>
-                          {entry.song.title}
-                        </span>
-                        <button
-                          className="queue-row-remove"
-                          onClick={() => queue.removeQueued(entry.uid)}
-                          aria-label={`Remove ${entry.song.title} from queue`}
-                          title="Remove from queue"
-                        >
-                          ✕
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                )}
+
+                {queue.upNext.length > 0 && (
+                  <>
+                    <div className="queue-section-label">Queued</div>
+                    <ul className="queue-list">
+                      {queue.upNext.map((entry, i) => (
+                        <li key={entry.uid} className="queue-row">
+                          <span className="queue-row-num">{i + 1}</span>
+                          <span className="queue-row-title" title={entry.song.title}>
+                            {entry.song.title}
+                          </span>
+                          <button
+                            className="queue-row-remove"
+                            onClick={() => queue.removeQueued(entry.uid)}
+                            aria-label={`Remove ${entry.song.title} from queue`}
+                            title="Remove from queue"
+                          >
+                            ✕
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+
+                {/* The rest of the playlist, in the order it will actually
+                    play — which is the shuffled order when shuffle is on. */}
+                {queue.contextUpNext.length > 0 && (
+                  <>
+                    <div className="queue-section-label">
+                      Next from {queue.nowPlaying?.name}
+                      {queue.shuffle && <span className="queue-shuffle-tag">shuffled</span>}
+                    </div>
+                    <ul className="queue-list">
+                      {queue.contextUpNext.map((entry, i) => (
+                        <li key={`${entry.songId}-${i}`} className="queue-row">
+                          <span className="queue-row-num">{i + 1}</span>
+                          <button
+                            className="queue-row-title queue-row-jump"
+                            onClick={() => queue.playContextSong(entry.songId)}
+                            title={`Play ${entry.song.title}`}
+                          >
+                            {entry.song.title}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
                 )}
               </div>
             </div>
